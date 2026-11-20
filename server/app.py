@@ -82,11 +82,25 @@ def set_cookie(resp, token):
     resp.set_cookie(COOKIE, token, max_age=365 * 86400, path="/", secure=SECURE, httponly=True, samesite="strict")
 
 
+class TooLarge(ValueError):
+    pass
+
+
+async def read_capped(request, limit):
+    """The request body, read chunk by chunk and abandoned beyond `limit` bytes: an oversized body (announced or
+    chunked) never sits in memory. The Guard middleware already refuses an announced Content-Length above the limit."""
+    if int(request.headers.get("content-length") or 0) > limit:
+        raise TooLarge("too large")
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf += chunk
+        if len(buf) > limit:
+            raise TooLarge("too large")
+    return bytes(buf)
+
+
 async def body_json(request):
-    raw = await request.body()
-    if len(raw) > MAX_JSON:
-        raise ValueError("too large")
-    return json.loads(raw or b"{}")
+    return json.loads(await read_capped(request, MAX_JSON) or b"{}")
 
 
 def page(name):
@@ -180,7 +194,7 @@ async def passkey_login_options(request):
 
 async def passkey_login_verify(request):
     ip = client_ip(request)
-    if not auth.login_allowed(ip):
+    if not auth.login_allowed(ip, passkey=True):
         return api(dict(error="too_many_attempts"), 429)
     try:
         token = auth.login_verify(await body_json(request))
@@ -227,10 +241,9 @@ async def undo(request):
 async def photo(request):
     if not session(request):
         return api(dict(error="login"), 401)
-    if int(request.headers.get("content-length") or 0) > MAX_PHOTO:
-        return api(dict(error="too_large"), 413)
-    data = await request.body()
-    if len(data) > MAX_PHOTO:
+    try:
+        data = await read_capped(request, MAX_PHOTO)
+    except TooLarge:
         return api(dict(error="too_large"), 413)
     if not data.startswith(b"\xff\xd8\xff"):
         return api(dict(error="not_jpeg"), 415)
@@ -273,6 +286,13 @@ class Guard(BaseHTTPMiddleware):
             if origin and origin.rstrip("/") != ORIGIN:
                 log.warning("cross-origin post refused", extra=dict(ev="origin_refused", origin=origin[:80]))
                 return api(dict(error="origin"), 403)
+            limit = MAX_PHOTO if request.url.path == "/api/photo" else MAX_JSON
+            try:
+                too_large = int(request.headers.get("content-length") or 0) > limit
+            except ValueError:
+                too_large = True
+            if too_large:                                   # refused before anything is read
+                return api(dict(error="too_large"), 413)
         resp: Response = await call_next(request)
         h = resp.headers
         h.setdefault("Cache-Control", "no-store")

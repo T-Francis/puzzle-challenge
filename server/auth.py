@@ -3,7 +3,8 @@
 - Password hash in the environment (PUZZLE_PASSWORD_HASH), produced by: python3 -m server.auth hash
 - Sessions: random 256-bit token in an HttpOnly, Secure, SameSite=Strict cookie; only its SHA-256 is stored
   (data/auth/sessions.json, atomic writes); valid 1 year, extended on use.
-- Rate limit: 5 failed logins per 15 min and per address; 20 failures in an hour lock the login for 15 min.
+- Rate limit: 5 failed logins per 15 min and per address; 20 failures in an hour lock the PASSWORD login for 15 min
+  (passkeys stay usable: they cannot be guessed).
 - Passkeys: registration (attestation "none") and authentication, signature checked with the stored COSE key
   (ES256 or RS256). Challenges are single use and expire after 5 min.
 """
@@ -112,11 +113,16 @@ class Auth:
                 self._save_sessions()
 
     # ------------------------------------------------------------ password login with rate limit
-    def login_allowed(self, ip):
+    def login_allowed(self, ip, passkey=False):
+        """Per address: FAIL_PER_IP failures per FAIL_WINDOW_S. The global lock (many failures from many addresses)
+        only stops passwords: a passkey cannot be guessed, so a password attack never locks the owner of the
+        fingerprint out."""
         now = time.time()
+        if len(self.fails) > 10000:                     # forget old addresses (memory bound under a spread attack)
+            self.fails = {k: v for k, v in self.fails.items() if v and now - v[-1] < FAIL_WINDOW_S}
         recent = [t for t in self.fails.get(ip, []) if now - t < FAIL_WINDOW_S]
         self.fails[ip] = recent
-        return now >= self.locked_until and len(recent) < FAIL_PER_IP
+        return (passkey or now >= self.locked_until) and len(recent) < FAIL_PER_IP
 
     def login(self, ip, password):
         """Returns a session token, None on a wrong password, or 'limited'."""

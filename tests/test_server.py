@@ -142,6 +142,26 @@ class ServerTest(unittest.TestCase):
         self.assertIsNotNone(s["proposal"])
         self.assertEqual(ws._active_model(), ws.model_dir)          # what a restart would load
 
+    def test_5_public_limits(self):
+        """What an anonymous visitor can do: no oversized body is read, a password attack never locks passkeys out."""
+        c = TestClient(self.app_mod.app, headers={"CF-Connecting-IP": "203.0.113.50"})
+        big = b"{" + b" " * (70 * 1024) + b"}"
+        self.assertEqual(c.post("/api/login", content=big, headers={"Content-Type": "application/json"}).status_code, 413)
+        self.assertEqual(c.post("/api/client-log", content=big).status_code, 413)
+        chunked = iter([b"{", b" " * (70 * 1024), b"}"])                # no Content-Length: read and abandoned at 64 KB
+        self.assertEqual(c.post("/api/login", content=chunked).status_code, 400)
+        self.assertEqual(c.post("/api/photo", content=b"\xff\xd8\xff" + b"0" * 100).status_code, 401)
+        for p in ("/api/state", "/api/diag"):
+            self.assertEqual(c.get(p).status_code, 401)
+        self.assertEqual(c.put("/api/state").status_code, 405)
+        a = self.app_mod.auth
+        a.locked_until = time.time() + 600                             # global password lock in force
+        try:
+            self.assertFalse(a.login_allowed("203.0.113.51"))
+            self.assertTrue(a.login_allowed("203.0.113.51", passkey=True))
+        finally:
+            a.locked_until = 0.0
+
 
 if __name__ == "__main__":
     unittest.main()
