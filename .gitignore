@@ -1,0 +1,29 @@
+# reproducible binary intermediates (sh scripts/pipeline.sh all)
+*.npz
+*.npy
+board/board_rectified.jpg
+
+# Python
+__pycache__/
+*.pyc
+
+# local secrets and development data
+.env
+.env.*
+!.env.example
+!.env.deploy.example
+server/dev-data/
+
+# editors / system
+.vscode/
+Thumbs.db
+desktop.ini
+
+# regenerated model of the workshop and built web assets
+data/model/
+server/web-dist/
+# journal and photos fetched from the server: private
+data/live/
+
+# internal notes, deployment of our instance, history backup: a separate private repository
+private/

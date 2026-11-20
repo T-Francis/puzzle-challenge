@@ -1,0 +1,5 @@
+{
+  "_help": "Derived from the live journal (data/live/journal.jsonl) once the workshop is running. placed: pieces confirmed physically, in order (cell, piece, rotation = canonical q in degrees). excluded: failed trials as 'cell:piece'.",
+  "placed": [],
+  "excluded": []
+}

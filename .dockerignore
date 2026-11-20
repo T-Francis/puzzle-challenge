@@ -1,0 +1,17 @@
+.git
+.vscode
+.env*
+photos/sheets
+photos/board
+catalog
+reports
+board
+docs
+data/measurements
+data/simulation
+data/*.png
+data/*.npy
+server/web-dist
+server/dev-data
+**/__pycache__
+private

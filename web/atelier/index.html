@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atelier · Lunes</title>
+<meta name="app-version" content="__APP_VERSION__">
+<meta name="board-image" content="board_clean.jpg">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b0d18">
+<link rel="manifest" href="/atelier/manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<section id="loading" class="screen">
+  <img src="icon.svg" alt="" class="logo">
+  <h1 data-t="appName"></h1>
+  <p id="loadStage" data-t="starting"></p>
+  <div class="bar"><i id="loadBar"></i></div>
+</section>
+
+<section id="login" class="screen hidden">
+  <img src="icon.svg" alt="" class="logo">
+  <h1 data-t="appName"></h1>
+  <button id="pkLogin" class="primary hidden" type="button" data-t="loginPasskey"></button>
+  <form id="pwForm">
+    <label for="pw" data-t="password"></label>
+    <input id="pw" type="password" autocomplete="current-password" required>
+    <button type="submit" data-t="login"></button>
+  </form>
+  <p id="loginErr" class="err" role="alert"></p>
+</section>
+
+<section id="main" class="hidden">
+  <header class="top">
+    <span id="counts"></span>
+    <button id="menuBtn" class="icon" type="button" data-title="menu">☰</button>
+  </header>
+
+  <div id="banners"></div>
+
+  <article id="card">
+    <section class="step" id="stepTake">
+      <h2><span class="num">1</span><span data-t="take"></span> <b id="pieceText" class="piece-id"></b></h2>
+      <div class="take">
+        <div class="sheet-letter"><span data-t="sheet"></span><b id="sheetLetter"></b></div>
+        <div class="take-where">
+          <p id="slotText"></p>
+          <svg id="miniSheet" aria-hidden="true"></svg>
+        </div>
+        <svg id="thumb" class="piece-view" viewBox="-80 -80 160 160" aria-hidden="true"></svg>
+      </div>
+    </section>
+
+    <section class="step" id="stepTurn">
+      <h2><span class="num">2</span><span data-t="turn"></span></h2>
+      <div class="turn">
+        <svg id="turnView" class="piece-view" viewBox="-95 -95 190 190" aria-hidden="true"></svg>
+        <p id="turnText" class="big"></p>
+      </div>
+    </section>
+
+    <section class="step" id="stepPlace">
+      <h2><span class="num">3</span><span data-t="place"></span> <b id="cellText"></b></h2>
+      <div class="place">
+        <svg id="zoom" aria-hidden="true"></svg>
+        <svg id="locator" aria-hidden="true"></svg>
+      </div>
+      <p id="meta" class="meta"></p>
+    </section>
+  </article>
+
+  <div id="empty" class="hidden">
+    <p data-t="noProposal"></p>
+  </div>
+
+  <footer class="bottom">
+  <nav class="secondary">
+    <button id="otherBtn" type="button" data-t="otherWay"></button>
+    <button id="skipBtn" type="button" data-t="skip"></button>
+    <button id="undoBtn" type="button" data-t="undo"></button>
+  </nav>
+  <nav class="answers">
+    <button id="noBtn" class="no" type="button"><span>✗</span><small data-t="noFit"></small></button>
+    <button id="yesBtn" class="yes" type="button"><span>✓</span><small data-t="fits"></small></button>
+  </nav>
+  </footer>
+</section>
+
+<dialog id="rotDlg">
+  <h3 data-t="whichWay"></h3>
+  <div id="rotChoices" class="rot-choices"></div>
+  <p class="right"><button type="button" data-close data-t="cancel"></button></p>
+</dialog>
+
+<dialog id="undoDlg">
+  <h3 data-t="undoTitle"></h3>
+  <p id="undoText"></p>
+  <p class="right"><button type="button" data-close data-t="cancel"></button> <button id="undoGo" class="primary" type="button" data-t="undoConfirm"></button></p>
+</dialog>
+
+<dialog id="menuDlg">
+  <h3 data-t="menu"></h3>
+  <div id="stats"></div>
+  <p><label class="file"><input id="photoInput" type="file" accept="image/jpeg" capture="environment"><span data-t="sendPhoto"></span></label></p>
+  <p class="hint" data-t="photoHint"></p>
+  <p><button id="pkRegister" type="button" data-t="addPasskey"></button></p>
+  <p><button id="langBtn" type="button"></button> <button id="themeBtn" type="button"></button> <button id="logoutBtn" type="button" data-t="logout"></button></p>
+  <p class="hint" id="versionText"></p>
+  <p class="right"><button type="button" data-close data-t="close"></button></p>
+</dialog>
+
+<dialog id="pkOffer">
+  <h3 data-t="pkOfferTitle"></h3>
+  <p data-t="pkOfferText"></p>
+  <p class="right"><button type="button" data-close data-t="later"></button> <button id="pkOfferGo" class="primary" type="button" data-t="addPasskey"></button></p>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>

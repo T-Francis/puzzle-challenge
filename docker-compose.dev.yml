@@ -1,0 +1,18 @@
+# Local development: http://localhost:8080 (demo) and http://localhost:8080/atelier/ (workshop).
+# Needs the model: sh scripts/pipeline.sh all && sh scripts/pipeline.sh model
+# Password: PUZZLE_PASSWORD_HASH in .env (docker compose run --rm puzzle python3 -m server.auth hash),
+# or PUZZLE_DEV_AUTOLOGIN=1 in .env to skip the login (local review only).
+name: puzzle-dev
+services:
+  puzzle:
+    build: { context: ., target: server }
+    image: puzzle-server:dev
+    user: "1000:1000"
+    ports: ["127.0.0.1:8080:8080"]
+    environment:
+      PUZZLE_ORIGIN: http://localhost:8080
+      PUZZLE_COOKIE_SECURE: "0"
+      PUZZLE_PASSWORD_HASH: ${PUZZLE_PASSWORD_HASH:-}
+      PUZZLE_DEV_AUTOLOGIN: ${PUZZLE_DEV_AUTOLOGIN:-0}
+    volumes:
+      - ./server/dev-data:/data

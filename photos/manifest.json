@@ -1,0 +1,36 @@
+{
+  "_help": "Photo inventory, the single source for all scripts. Paths relative to photos/. Every photo is stored in reading direction (sheets the right way up, puzzle with the text readable at the bottom). 'origin' = file name as it came out of the phone.",
+  "sheets": {
+    "_help": "Each photo is a VIEW of all or part of a sheet. SAME PROCESS FOR EVERY SHEET: every photo declared here is measured and fused (src/fusion.py); the most recent one of a piece gives the orientation of the piece on its sheet (proposed rotations). Naming: <sheet>[_colXX-YY]_<date>[_<time>].jpg (time only if a sheet has several photos the same day). columns = [first, last] sheet column visible; rows = number of rows. Number of a piece = row × 10 + column (grid of 10 for every sheet; E: E001–E010 then E011–E012 below E001–E002). If the photo shows ANOTHER layout (former layout of the sheet), 'number_grid' gives the number of each position of the photo, row by row. zone_x / zone_y (fractions of width / height): area of the pieces of the sheet; pieces out of the zone (another sheet in the frame) are ignored. Scale: computed automatically, recalibrated on the pieces seen on other photos (corrects a photo taken at an angle); no value to enter. contour: 'mid_level' (whole sheet, glare filled) or 'top_surface' (close-up photo: cardboard edge excluded).",
+    "photos": [
+      {"file": "sheets/A_2026-11-18.jpg", "sheet": "A", "columns": [1, 10], "rows": 10, "contour": "mid_level", "origin": "A.jpg"},
+      {"file": "sheets/B_2026-11-18.jpg", "sheet": "B", "columns": [1, 10], "rows": 10, "contour": "mid_level", "origin": "B.jpg"},
+      {"file": "sheets/C_2026-11-18.jpg", "sheet": "C", "columns": [1, 10], "rows": 10, "contour": "mid_level", "origin": "C.jpg", "_note": "the bottom of the photo shows the top of sheet D (cut pieces, ignored)"},
+      {"file": "sheets/D_2026-11-18.jpg", "sheet": "D", "columns": [1, 10], "rows": 10, "contour": "mid_level", "origin": "D.jpg"},
+      {"file": "sheets/E_2026-11-18.jpg", "sheet": "E", "columns": [1, 8], "rows": 1, "contour": "mid_level", "origin": "E.jpg", "_note": "former layout: E001–E008 in one row (same as the current first row, standard numbering)."},
+      {"file": "sheets/A_col01-05_2026-11-19.jpg", "sheet": "A", "columns": [1, 5], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_120314.jpg"},
+      {"file": "sheets/A_col06-10_2026-11-19.jpg", "sheet": "A", "columns": [6, 10], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_120442.jpg"},
+      {"file": "sheets/B_col01-05_2026-11-19.jpg", "sheet": "B", "columns": [1, 5], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_120600.jpg"},
+      {"file": "sheets/B_col06-10_2026-11-19.jpg", "sheet": "B", "columns": [6, 10], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_120657.jpg"},
+      {"file": "sheets/C_col01-05_2026-11-19.jpg", "sheet": "C", "columns": [1, 5], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_120843.jpg"},
+      {"file": "sheets/C_col06-10_2026-11-19.jpg", "sheet": "C", "columns": [6, 10], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_121030.jpg", "_note": "photo taken in landscape, turned the right way up"},
+      {"file": "sheets/D_col01-05_2026-11-19.jpg", "sheet": "D", "columns": [1, 5], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_121133.jpg"},
+      {"file": "sheets/D_col06-10_2026-11-19.jpg", "sheet": "D", "columns": [6, 10], "rows": 10, "contour": "top_surface", "origin": "IMG_20261119_121243.jpg"},
+      {"file": "sheets/E_col01-05_2026-11-19.jpg", "sheet": "E", "columns": [1, 5], "rows": 2, "zone_y": [0.25, 0.555], "contour": "top_surface", "origin": "IMG_20261119_161429.jpg", "_note": "E001–E005, and E011–E012 below E001–E002. The bottom shows pieces of C: out of zone, ignored."},
+      {"file": "sheets/E_col06-10_2026-11-19.jpg", "sheet": "E", "columns": [6, 10], "rows": 1, "zone_y": [0.25, 0.60], "contour": "top_surface", "origin": "IMG_20261119_161440.jpg", "_note": "E006–E010. The bottom shows pieces of C: out of zone, ignored."},
+      {"file": "sheets/E_2026-11-19_1716.jpg", "sheet": "E", "columns": [1, 10], "rows": 2, "zone_y": [0.40, 0.60], "contour": "top_surface", "origin": "IMG_20261119_171651.jpg", "_note": "whole sheet, current layout (E001–E010, E011–E012 below); taken slightly at an angle (scale recalibrated automatically). The bottom shows pieces of C: out of zone, ignored."}
+    ],
+    "_rejected_note": "The 64 Mpx sheet photos of 2026-11-20 (IMG_20261120_103242 / 103311 / 103329 / 104253 / 103355) were measured and fused on 2026-11-20 and not kept: side lighting (bright cardboard rim on one side, cast shadow on the other) biases their outlines asymmetrically; whole-outline agreement with the other photos 0.9–1.2 u vs 0.65–0.72 u between the 18th and 19th; adding them gave no gain on the engine sigma, the cells with >= 2 sides or the piece<->piece pairs (mutual pairs 340 -> 324, strong 22 -> 11)."
+  },
+  "board": {
+    "_help": "The reference defines the numbering of the cells L(line)-C(column), counted from the top-left corner of the puzzle in reading direction.",
+    "reference": "board/board_2026-11-18.jpg",
+    "_reference_note": "The 64 Mpx board photo of 2026-11-20 (IMG_20261120_104350) was tried as the reference and rejected: camera shake (edges across the board's x axis 2.0 u wide vs 1.5 u), sockets worse (best match p90 3.8 u vs 2.2 u, 63 sockets > 2.5 u vs 12). Not kept.",
+    "others": [
+      {"file": "board/board_2026-11-19_top-left.jpg", "part": "top-left quarter", "origin": "IMG_20261119_121604.jpg", "usage": "count of the placed pieces (reports/board_count.md); second view of the board audit contact sheets"},
+      {"file": "board/board_2026-11-19_top-right.jpg", "part": "top-right quarter", "origin": "IMG_20261119_121542.jpg", "usage": "count of the placed pieces (reports/board_count.md); second view of the board audit contact sheets"},
+      {"file": "board/board_2026-11-19_bottom-left.jpg", "part": "bottom-left quarter", "origin": "IMG_20261119_121418.jpg", "usage": "count of the placed pieces (reports/board_count.md); second view of the board audit contact sheets"},
+      {"file": "board/board_2026-11-19_bottom-right.jpg", "part": "bottom-right quarter", "origin": "IMG_20261119_121428.jpg", "usage": "count of the placed pieces (reports/board_count.md); second view of the board audit contact sheets"}
+    ]
+  }
+}

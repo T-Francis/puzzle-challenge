@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Moons · reconstruction</title>
+<meta name="description" content="Animated reconstruction of the Moons puzzle: 412 plain black pieces placed by shape alone.">
+<meta name="theme-color" content="#05060d">
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div id="sky"></div>
+<canvas id="stars"></canvas>
+<svg id="scene" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="sceneLabel">
+  <title id="sceneLabel">Board and sheets</title>
+  <defs>
+    <linearGradient id="pieceFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2a2a31"/><stop offset="45%" stop-color="#141418"/><stop offset="100%" stop-color="#0b0b0e"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="b"/><feFlood flood-color="#6ee7ff" flood-opacity=".9"/>
+      <feComposite in2="b" operator="in" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="sweep" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#c8f7ff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g id="world">
+    <g id="board"></g>
+    <g id="sheets"></g>
+    <g id="pieces"></g>
+    <g id="fx"></g>
+  </g>
+</svg>
+<div id="progress"><i></i></div>
+<header>
+  <div class="brand"><h1 data-t="title"></h1><small data-t="subtitle"></small></div>
+  <span class="badge" data-t="badge" data-title="badgeTip"></span>
+  <div class="stat"><b id="placed">0</b><span data-t="placedOf"></span></div>
+</header>
+<div id="caption" class="hidden" aria-live="polite"></div>
+<div id="fitLegend" class="hidden">
+  <span><i class="sw good"></i><span data-t="fitGood"></span> <em id="fitN-good"></em></span>
+  <span><i class="sw fair"></i><span data-t="fitFair"></span> <em id="fitN-fair"></em></span>
+  <span><i class="sw poor"></i><span data-t="fitPoor"></span> <em id="fitN-poor"></em></span>
+  <small data-t="fitNote"></small>
+</div>
+<nav id="zoom">
+  <button id="zIn" data-title="zoomIn" type="button">＋</button>
+  <button id="zOut" data-title="zoomOut" type="button">－</button>
+  <button id="zBoard" data-title="frameBoard" type="button">⤢</button>
+  <button id="zAll" data-title="frameAll" type="button">⊞</button>
+</nav>
+<footer>
+  <div class="row">
+    <button id="restart" data-title="restart" type="button">⏮</button>
+    <button id="play" data-title="playPause" type="button">▶</button>
+    <select id="speed" data-title="speed">
+      <option value="0.5">×0.5</option><option value="1" selected>×1</option><option value="2">×2</option><option value="4">×4</option>
+    </select>
+    <button id="lang" data-title="language" type="button">FR</button>
+    <button id="fitBtn" data-title="fitToggle" type="button" aria-pressed="false">◐</button>
+    <button id="aboutBtn" data-title="about" type="button">?</button>
+  </div>
+  <div class="row">
+    <input id="slider" type="range" min="0" max="1000" value="0" step="1" data-label="timeline">
+    <span id="count">0 / 0</span>
+  </div>
+</footer>
+<div id="finale" class="hidden"><div><b>412 / 412</b><span data-t="finale"></span><small data-t="credit"></small></div></div>
+<div id="about" class="hidden" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+  <div class="box">
+    <h3 id="aboutTitle" data-t="aboutTitle"></h3>
+    <p data-t="about1"></p>
+    <p data-t="about2"></p>
+    <p data-t="about3"></p>
+    <p data-t="keys"></p>
+    <p class="right"><button id="aboutClose" type="button" data-t="close"></button></p>
+  </div>
+</div>
+<script src="demo_data.js"></script>
+<script src="demo.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "_help": "corners_px: corners entered by hand, per photo (key = photo name without extension) then per piece, in pixels of the photo (any order). They are snapped to the nearest contour point.",
+  "corners_px": {
+    "B_2026-11-18": {
+      "B018": [[3417, 571], [3657, 598], [3637, 798], [3422, 800]]
+    }
+  }
+}
