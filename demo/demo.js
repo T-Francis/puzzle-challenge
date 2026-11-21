@@ -70,6 +70,7 @@
   const fitClass = (v) => (v == null || !FIT ? "" : v <= FIT.good_u ? "good" : v <= FIT.fair_u ? "fair" : "poor");
   const N = PATH.length;
   const SLOT = 140, HEAD = 120, GAP = 140;
+  const ON_SHEET = 0.74;        // with its tabs a piece reaches up to 181 u for a 140 u slot: drawn smaller on its sheet, full size once flown
 
   // timeline: slow at first, then a cascade (several pieces in flight)
   const GAP0 = 1100, DECAY = 0.94, GAP_MIN = 120, DUR0 = 1300, DDECAY = 0.97, DUR_MIN = 650;
@@ -133,7 +134,7 @@
     for (const p of D.pieces) {
       p.path = p.path || pathD(p.d);
       const t = slotT(p);
-      el("path", { d: p.path, class: "ghost", transform: `translate(${t.x} ${t.y}) rotate(${t.a})` }, sheets);
+      el("path", { d: p.path, class: "ghost", transform: `translate(${t.x} ${t.y}) rotate(${t.a}) scale(${ON_SHEET})` }, sheets);
       if (!pieceEl.has(p.id)) {
         const g = el("g", { class: "piece" }, pieces);
         el("path", { d: p.path }, g);
@@ -176,7 +177,7 @@
     const e = ease(k);
     return { t: { x: (1 - e) * (1 - e) * from.x + 2 * (1 - e) * e * cx + e * e * to.x,
                   y: (1 - e) * (1 - e) * from.y + 2 * (1 - e) * e * cy + e * e * to.y, a: from.a + da * e },
-             s: 1 + 0.45 * Math.sin(Math.PI * e) };
+             s: lerp(ON_SHEET, 1, e) + 0.45 * Math.sin(Math.PI * e) };
   }
   function render(effects) {
     let placed = D.real.length, captionI = -1;
@@ -197,7 +198,7 @@
             g.classList.remove("land"); void g.getBBox(); g.classList.add("land");
             if (dur[i] > 900 || i % 6 === 0) burst(x, y);
           }
-        } else setT(g, slotT(PIECES.get(pid)));
+        } else setT(g, slotT(PIECES.get(pid)), ON_SHEET);
       }
       if (ns !== state[i]) g.classList.toggle("placed", ns === 2);
       state[i] = ns;
