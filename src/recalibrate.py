@@ -8,7 +8,8 @@ keeps answering meanwhile. Progress and result in <work dir>/status.json:
 Checks, in order (a failed check rejects the photo; the page tells why):
   frame    the puzzle frame is found (photo turned automatically: the orientation whose empty cells agree with the
            journal wins)
-  blur     edge width of the paper / piece boundary ≤ BLUR_MAX_U in both directions (rejects a shaken photo)
+  blur     edge width of the paper / piece boundary ≤ BLUR_MAX_PX photo pixels in both directions (rejects a shaken
+           or out-of-focus photo)
   cells    the empty cells on the photo = the cells expected empty from the journal (params.json empty_cells minus
            the placements recorded before the photo); the cells that differ are reported
   sockets  the sockets are not read worse than with the current model (median best score ≤ SOCKETS_MAX_RATIO × current)
@@ -22,7 +23,9 @@ import cv2
 import board_model as bm
 
 MAX_SIDE = 5000              # px: the photo is reduced to this (memory of the server; the board needs ≈ 1.3–2.5 px/u)
-BLUR_MAX_U = 1.95            # u: reference photo 1.46 / 1.64, a shaken 64 Mpx photo 2.0
+BLUR_MAX_PX = 2.35           # px of the photo: reference 1.84 / 2.05, a sharp 12.5 Mpx photo 1.86 / 2.21, a slightly
+                             # blurred one 2.42 / 2.54 (it misread a pale moon piece). In px, not u: a sharp photo
+                             # taken with fewer pixels per piece has wider edges in u without being blurred
 SOCKETS_MAX_RATIO = 1.15
 MODEL_FILES = ["pieces.json", "pieces_raw.npz", "params.json"]
 
@@ -151,8 +154,12 @@ def process(photo, model_dir, work, expected, placements=None, scores=True):
     geom = json.load(open(os.path.join(out, "board_geom.json")))
     white = cv2.imread(os.path.join(out, "board_empty_mask.png"), cv2.IMREAD_GRAYSCALE)
     ew = edge_width(im, s["rimg"], (white > 0).astype(np.uint8), np.array(geom["H"]))
-    if ew is None or max(ew) > BLUR_MAX_U:
-        raise Rejected("blur", edge_width_u=None if ew is None else [round(x, 2) for x in ew])
+    c = np.array(geom["corners_px"], float)                    # frame corners in the photo
+    area = 0.5 * abs(np.dot(c[:, 0], np.roll(c[:, 1], 1)) - np.dot(c[:, 1], np.roll(c[:, 0], 1)))
+    ppu = float(np.sqrt(area / (geom["cols"] * geom["cell_w_u"] * geom["rows"] * geom["cell_h_u"])))
+    ew_px = None if ew is None else [x * ppu for x in ew]
+    if ew_px is None or max(ew_px) > BLUR_MAX_PX:
+        raise Rejected("blur", edge_width_px=None if ew_px is None else [round(x, 2) for x in ew_px], px_per_u=round(ppu, 2))
     if s["disagreements"]:
         dis = s["disagreements"]
         raise Rejected("cells", rotation=k,
@@ -193,7 +200,7 @@ def process(photo, model_dir, work, expected, placements=None, scores=True):
     for d in os.listdir(work):
         if d.startswith("board_rot"):
             shutil.rmtree(os.path.join(work, d), ignore_errors=True)
-    return dict(rotation=k, n_empty=s["n_empty"], edge_width_u=[round(x, 2) for x in ew],
+    return dict(rotation=k, n_empty=s["n_empty"], edge_width_px=[round(x, 2) for x in ew_px], px_per_u=round(ppu, 2),
                 best_median_u=round(now, 3), current_u=round(cur, 3), version=v)
 
 

@@ -23,6 +23,20 @@ class JournalTest(unittest.TestCase):
         events = [ev(1, "fits", "L1-C1", "A001"), ev(2, "fits", "L1-C2", "A002"), dict(seq=3, id="e3", type="undo", target=1)]
         self.assertEqual(len(journal.effective(events)), 2)
 
+    def test_correction_replaces_an_older_answer_in_place(self):
+        """A ✗ later found placed: the correction turns it into a placement at its own position in the order."""
+        events = [ev(1, "fits", "L1-C1", "A001"), ev(2, "does_not_fit", "L1-C2", "A050", 180, proposal=dict(bucket="B")),
+                  ev(3, "fits", "L1-C3", "A003"),
+                  dict(seq=4, id="e4", type="correction", target=2, answer="fits", rotation=180, cell="L1-C2", piece="A050")]
+        pl = journal.placements(events)
+        self.assertEqual([p["piece"] for p in pl["placed"]], ["A001", "A050", "A003"])
+        self.assertEqual(pl["placed"][1]["rotation"], 180)
+        self.assertEqual(pl["excluded"], [])
+        self.assertEqual(journal.outcomes(events), [("B", True)])          # the calibration counts it as a success
+        # the last answer can still be undone after a correction of an older one
+        events.append(dict(seq=5, id="e5", type="undo", target=3))
+        self.assertEqual([p["piece"] for p in journal.placements(events)["placed"]], ["A001", "A050"])
+
     def test_placements_format(self):
         events = [ev(1, "fits", "L1-C1", "A001", 90), ev(2, "fits_other_rotation", "L1-C2", "A002", 270),
                   ev(3, "does_not_fit", "L1-C3", "A003"), ev(4, "does_not_fit", "L1-C3", "A003"), ev(5, "skip", "L1-C4")]

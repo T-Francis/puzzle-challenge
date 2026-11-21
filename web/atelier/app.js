@@ -11,13 +11,13 @@
   const STR = {
     fr: {
       appName: "Atelier · Lunes", starting: "Démarrage…", loginPasskey: "Se connecter avec l'empreinte", password: "Mot de passe",
-      login: "Se connecter", showPw: "Afficher", hidePw: "Masquer", wrongPassword: "Mot de passe incorrect.", tooMany: "Trop d'essais : réessaie dans 15 minutes.",
+      putBackDone: "C'est fait", login: "Se connecter", showPw: "Afficher", hidePw: "Masquer", wrongPassword: "Mot de passe incorrect.", tooMany: "Trop d'essais : réessaie dans 15 minutes.",
       take: "Prendre", turn: "Tourner", place: "Poser", sheet: "plaque", line: "ligne", column: "colonne",
       turns: ["Ne pas la tourner", "¼ de tour vers la droite", "Demi-tour", "¼ de tour vers la gauche"],
       otherWay: "Rentre dans un autre sens", skip: "Passer la case", undo: "Annuler", noFit: "ne rentre pas", fits: "rentre",
       whichWay: "Dans quel sens est-elle rentrée ?", cancel: "Fermer", undoTitle: "Annuler la dernière réponse ?",
       undoConfirm: "Annuler la réponse", menu: "Menu", sendPhoto: "Envoyer une photo du puzzle",
-      photoHint: "De face, au-dessus du centre du puzzle, lumière douce, sans flash.", addPasskey: "Activer l'empreinte",
+      photoHint: "De face, au-dessus du centre du puzzle, lumière douce, sans flash. Le mieux : la prendre avec l'appli Appareil photo en pleine résolution, puis la choisir ici dans la galerie.", addPasskey: "Activer l'empreinte",
       logout: "Se déconnecter", close: "Fermer", later: "Plus tard", pkOfferTitle: "Se connecter avec l'empreinte ?",
       pkOfferText: "La prochaine fois, l'empreinte (ou le code du téléphone) suffira.", noProposal: "Plus aucune proposition pour l'instant.",
       try_: (k) => (k > 1 ? `Essai ${k} dans cette case` : "1er essai dans cette case"), chance: "chance", buckets: { A: "fiable", B: "possible", C: "faible" },
@@ -48,13 +48,13 @@
     },
     en: {
       appName: "Workshop · Moons", starting: "Starting…", loginPasskey: "Log in with fingerprint", password: "Password",
-      login: "Log in", showPw: "Show", hidePw: "Hide", wrongPassword: "Wrong password.", tooMany: "Too many attempts: try again in 15 minutes.",
+      putBackDone: "Done", login: "Log in", showPw: "Show", hidePw: "Hide", wrongPassword: "Wrong password.", tooMany: "Too many attempts: try again in 15 minutes.",
       take: "Take", turn: "Turn", place: "Place", sheet: "sheet", line: "row", column: "column",
       turns: ["Do not turn it", "¼ turn clockwise", "Half turn", "¼ turn anticlockwise"],
       otherWay: "Fits another way", skip: "Skip cell", undo: "Undo", noFit: "does not fit", fits: "fits",
       whichWay: "Which way did it fit?", cancel: "Close", undoTitle: "Undo the last answer?",
       undoConfirm: "Undo the answer", menu: "Menu", sendPhoto: "Send a photo of the puzzle",
-      photoHint: "From the front, above the centre of the puzzle, soft light, no flash.", addPasskey: "Enable fingerprint",
+      photoHint: "From the front, above the centre of the puzzle, soft light, no flash. Best: take it with the Camera app at full resolution, then pick it here from the gallery.", addPasskey: "Enable fingerprint",
       logout: "Log out", close: "Close", later: "Later", pkOfferTitle: "Log in with your fingerprint?",
       pkOfferText: "Next time, your fingerprint (or the phone code) will be enough.", noProposal: "No proposal left for now.",
       try_: (k) => (k > 1 ? `Try ${k} in this cell` : "1st try in this cell"), chance: "chance", buckets: { A: "reliable", B: "possible", C: "weak" },
@@ -199,12 +199,14 @@
     $("#counts").textContent = T("counts")(s.counts);
     const banners = $("#banners");
     banners.replaceChildren();
-    if (s.put_back) {
+    if (s.put_back && String(s.put_back.seq) !== store.get("atelier.putBackDone")) {
       const b = document.createElement("div"); b.className = "banner putback";
       const sv = document.createElementNS(NS, "svg"); sv.setAttribute("viewBox", "-80 -80 160 160");
       pieceSvg(sv, s.put_back.shape, 90 * s.put_back.display_turns);
       const p = document.createElement("p"); p.innerHTML = "↩ " + T(s.put_back.remove ? "removeBack" : "putBack")(s.put_back);
-      b.append(sv, p); banners.appendChild(b);
+      const ok = document.createElement("button"); ok.type = "button"; ok.textContent = T("putBackDone");
+      ok.onclick = () => { store.set("atelier.putBackDone", String(s.put_back.seq)); b.remove(); };
+      b.append(sv, p, ok); banners.appendChild(b);
     }
     const prop = s.proposal;
     if (prop && prop.weak) addBanner(T("weak"));

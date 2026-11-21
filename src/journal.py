@@ -4,7 +4,9 @@ The journal is the only truth about the real puzzle. One JSON event per line, ap
   {"seq", "id", "ts", "type", "cell", "piece", "rotation", "proposal", "model", "app", "device"}
 types: fits (piece placed with the proposed rotation), fits_other_rotation (placed, another rotation: "rotation" is
 the real one), does_not_fit (the piece does not fit in the cell in any rotation), skip (cell put aside for now),
-undo ("target" = seq of the answer undone; only the last effective answer can be undone).
+undo ("target" = seq of the answer undone; only the last effective answer can be undone), correction ("target" =
+seq of an earlier answer, "answer" = the answer it should have been, "rotation"; written by hand when the user reports
+a mistake the app can no longer undo, e.g. a ✗ on a piece that was in fact placed: it keeps its place in the order).
 "rotation" is always the canonical q in degrees (as in data/placements.json).
 """
 import json, os
@@ -40,13 +42,19 @@ def append(path, event):
 
 
 def effective(events):
-    """Answers still in force, in order (undo removes the last answer in force)."""
+    """Answers still in force, in order (undo removes the last answer in force; a correction replaces an earlier
+    answer in place, keeping its position and seq)."""
     stack = []
     for e in events:
         if e["type"] in ANSWERS:
             stack.append(e)
         elif e["type"] == "undo" and stack and stack[-1]["seq"] == e.get("target"):
             stack.pop()
+        elif e["type"] == "correction" and e.get("answer") in ANSWERS:
+            for i, a in enumerate(stack):
+                if a["seq"] == e.get("target"):
+                    stack[i] = dict(a, type=e["answer"], rotation=e.get("rotation", a.get("rotation")), corrected_by=e["seq"])
+                    break
     return stack
 
 

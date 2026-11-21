@@ -105,11 +105,11 @@ class Workshop:
         last_raw = self.events[-1] if self.events else None
         put_back = None
         if eff and eff[-1]["type"] == "does_not_fit" and last_raw is eff[-1]:
-            put_back = dict(self._piece_info(eff[-1]["piece"]), cell=eff[-1]["cell"], remove=False)
+            put_back = dict(self._piece_info(eff[-1]["piece"]), cell=eff[-1]["cell"], remove=False, seq=eff[-1]["seq"])
         elif last_raw and last_raw["type"] == "undo":
             undone = next((x for x in self.events if x["seq"] == last_raw.get("target")), None)
             if undone and undone["type"] in ("fits", "fits_other_rotation"):
-                put_back = dict(self._piece_info(undone["piece"]), cell=undone["cell"], remove=True)
+                put_back = dict(self._piece_info(undone["piece"]), cell=undone["cell"], remove=True, seq=last_raw["seq"])
         prop = None
         if self.current:
             c = self.current
