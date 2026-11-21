@@ -6,12 +6,19 @@ types: fits (piece placed with the proposed rotation), fits_other_rotation (plac
 the real one), does_not_fit (the piece does not fit in the cell in any rotation), skip (cell put aside for now),
 undo ("target" = seq of the answer undone; only the last effective answer can be undone), correction ("target" =
 seq of an earlier answer, "answer" = the answer it should have been, "rotation"; written by hand when the user reports
-a mistake the app can no longer undo, e.g. a ✗ on a piece that was in fact placed: it keeps its place in the order).
+a mistake the app can no longer undo, e.g. a ✗ on a piece that was in fact placed: it keeps its place in the order),
+remove (an earlier placement taken out of the puzzle: "target" = seq of the placement, "cell", "piece", "reason" =
+"wrong" — it had play / did not belong there: the pair is excluded and the trial counts as a failure — or "other" —
+taken out for another reason: no exclusion, the trial no longer counts), manual (a piece the user placed herself:
+"cell", "piece", "rotation"; lifts an earlier exclusion of that pair, and an earlier ✗ of that pair counts as a
+success). remove and manual are actions like the answers: the last one can be undone.
 "rotation" is always the canonical q in degrees (as in data/placements.json).
 """
 import json, os
 
 ANSWERS = ("fits", "fits_other_rotation", "does_not_fit", "skip")
+PLACING = ("fits", "fits_other_rotation", "manual")
+REMOVE_REASONS = ("wrong", "other")
 SKIP_COOLDOWN = 10          # a skipped cell comes back after this many answers (or when a neighbour is placed)
 
 
@@ -41,16 +48,26 @@ def append(path, event):
         os.fsync(f.fileno())
 
 
+def in_force(eff):
+    """Placements of an effective list still on the puzzle (not taken out by a remove), in order."""
+    removed = {e["target"] for e in eff if e["type"] == "remove"}
+    return [e for e in eff if e["type"] in PLACING and e["seq"] not in removed]
+
+
 def effective(events):
-    """Answers still in force, in order (undo removes the last answer in force; a correction replaces an earlier
-    answer in place, keeping its position and seq)."""
+    """Actions still in force, in order (undo removes the last action in force; a correction replaces an earlier
+    answer in place, keeping its position and seq; a remove only counts if its target is a placement in force)."""
     stack = []
     for e in events:
-        if e["type"] in ANSWERS:
+        t = e["type"]
+        if t in ANSWERS or t == "manual":
             stack.append(e)
-        elif e["type"] == "undo" and stack and stack[-1]["seq"] == e.get("target"):
+        elif t == "remove":
+            if e.get("reason") in REMOVE_REASONS and any(a["seq"] == e.get("target") for a in in_force(stack)):
+                stack.append(e)
+        elif t == "undo" and stack and stack[-1]["seq"] == e.get("target"):
             stack.pop()
-        elif e["type"] == "correction" and e.get("answer") in ANSWERS:
+        elif t == "correction" and e.get("answer") in ANSWERS:
             for i, a in enumerate(stack):
                 if a["seq"] == e.get("target"):
                     stack[i] = dict(a, type=e["answer"], rotation=e.get("rotation", a.get("rotation")), corrected_by=e["seq"])
@@ -60,14 +77,23 @@ def effective(events):
 
 def placements(events):
     """Same format as data/placements.json."""
+    eff = effective(events)
+    kept = {e["seq"] for e in in_force(eff)}
     placed, excluded = [], []
-    for e in effective(events):
-        if e["type"] in ("fits", "fits_other_rotation"):
+
+    def exclude(key):
+        if key not in excluded:
+            excluded.append(key)
+    for e in eff:
+        key = f"{e.get('cell')}:{e.get('piece')}"
+        if e["type"] in PLACING and e["seq"] in kept:
             placed.append(dict(cell=e["cell"], piece=e["piece"], rotation=e["rotation"]))
+            if e["type"] == "manual" and key in excluded:
+                excluded.remove(key)
         elif e["type"] == "does_not_fit":
-            key = f"{e['cell']}:{e['piece']}"
-            if key not in excluded:
-                excluded.append(key)
+            exclude(key)
+        elif e["type"] == "remove" and e["reason"] == "wrong":
+            exclude(key)
     return dict(placed=placed, excluded=excluded)
 
 
@@ -83,19 +109,32 @@ def skipped_cells(events, neighbours):
         if len(later) >= SKIP_COOLDOWN:
             continue
         nb = set(neighbours(e["cell"]))
-        if any(x["type"] in ("fits", "fits_other_rotation") and x["cell"] in nb for x in later):
+        if any(x["type"] in PLACING and x["cell"] in nb for x in later):
             continue
         out.add(e["cell"])
     return out
 
 
 def outcomes(events):
-    """(bucket, success) of every answered proposal, for the calibration (skips do not count)."""
+    """(bucket, success) of every answered proposal, for the calibration (skips do not count). A placement taken out
+    as "wrong" is a failure, one taken out for another reason no longer counts; a ✗ on a pair the user later placed
+    herself is a success."""
+    eff = effective(events)
+    removed = {e["target"]: e["reason"] for e in eff if e["type"] == "remove"}
+    manual = {(e["cell"], e["piece"]) for e in in_force(eff) if e["type"] == "manual"}
     out = []
-    for e in effective(events):
+    for e in eff:
         b = (e.get("proposal") or {}).get("bucket")
-        if b and e["type"] != "skip":
-            out.append((b, e["type"] != "does_not_fit"))
+        if not b or e["type"] not in ANSWERS or e["type"] == "skip":
+            continue
+        ok = e["type"] != "does_not_fit"
+        if e["seq"] in removed:
+            if removed[e["seq"]] != "wrong":
+                continue
+            ok = False
+        elif not ok and (e["cell"], e["piece"]) in manual:
+            ok = True
+        out.append((b, ok))
     return out
 
 

@@ -108,12 +108,48 @@
 <dialog id="menuDlg">
   <h3 data-t="menu"></h3>
   <div id="stats"></div>
-  <p><label class="file"><input id="photoInput" type="file" accept="image/jpeg"><span data-t="sendPhoto"></span></label></p>
+  <h4 data-t="fixTitle"></h4>
+  <p class="fix-row"><button id="removeBtn" type="button" data-t="removeOpen"></button> <button id="manualBtn" type="button" data-t="manualOpen"></button></p>
+  <p><label class="file"><input id="photoInput" type="file" accept="image/*"><span data-t="sendPhoto"></span></label></p>
   <p class="hint" data-t="photoHint"></p>
   <p><button id="pkRegister" type="button" data-t="addPasskey"></button></p>
   <p><button id="langBtn" type="button"></button> <button id="themeBtn" type="button"></button> <button id="logoutBtn" type="button" data-t="logout"></button></p>
   <p class="hint" id="versionText"></p>
   <p class="right"><button type="button" data-close data-t="close"></button></p>
+</dialog>
+
+<dialog id="removeDlg">
+  <h3 data-t="removeOpen"></h3>
+  <div id="removePick">
+    <input id="removeFilter" type="search" autocomplete="off" autocapitalize="characters" spellcheck="false" data-ph="removeFilterPh">
+    <ul id="removeList" class="pick-list"></ul>
+  </div>
+  <div id="removeConfirm" class="hidden">
+    <p id="removeText"></p>
+    <p class="choice-col">
+      <button id="removeWrong" class="primary" type="button" data-t="removeWrong"></button>
+      <span class="hint" data-t="removeWrongHint"></span>
+      <button id="removeOther" type="button" data-t="removeOther"></button>
+      <span class="hint" data-t="removeOtherHint"></span>
+    </p>
+  </div>
+  <p class="right"><button type="button" data-close data-t="cancel" autofocus></button></p>
+</dialog>
+
+<dialog id="manualDlg">
+  <h3 data-t="manualOpen"></h3>
+  <form id="manualForm" class="manual-form">
+    <label><span data-t="line"></span> <input id="manualRow" type="number" inputmode="numeric" min="1" max="36" required></label>
+    <label><span data-t="column"></span> <input id="manualCol" type="number" inputmode="numeric" min="1" max="28" required></label>
+    <label><span data-t="pieceLabel"></span> <input id="manualPiece" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="D51" required></label>
+    <button class="primary" type="submit" data-t="next"></button>
+  </form>
+  <div id="manualRot" class="hidden">
+    <p data-t="manualWhichWay"></p>
+    <div id="manualChoices" class="rot-choices four"></div>
+  </div>
+  <p id="manualErr" class="err" role="alert"></p>
+  <p class="right"><button type="button" data-close data-t="cancel"></button></p>
 </dialog>
 
 <dialog id="pkOffer">

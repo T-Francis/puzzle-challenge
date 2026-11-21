@@ -106,8 +106,17 @@ class LiveEngine:
         """Rebuilds the state for a placements dict (journal.placements or data/placements.json).
         Scores cached for cells that kept the board sides (version 0) are reused; any changed cell is rescored."""
         self.reset()
-        for x in placements["placed"]:
-            self.place(x["cell"], x["piece"], x["rotation"] // 90)
+        # A placement with no known side (its only placed neighbour was taken out since) is retried after the others,
+        # which may give it sides; failing that it stays placed, unfitted (the cell is occupied, the piece is used).
+        todo = list(placements["placed"])
+        while todo:
+            left = [x for x in todo if not self.place(x["cell"], x["piece"], x["rotation"] // 90)]
+            if len(left) == len(todo):
+                for x in left:
+                    self.filled.add(x["cell"])
+                    self.placed.append(dict(cell=x["cell"], piece=x["piece"], rotation=x["rotation"]))
+                break
+            todo = left
         self.excluded = set(placements.get("excluded", []))
 
     def _cell_version(self, cid):

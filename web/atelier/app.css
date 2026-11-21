@@ -98,6 +98,19 @@ dialog h3 { margin: 0 0 10px; }
 .rot-choices button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; }
 .rot-choices svg { width: 84px; height: 84px; }
 .hint { color: var(--muted); font-size: 13px; }
+.rot-choices.four { grid-template-columns: repeat(2, 1fr); }
+.fix-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.fix-row button { flex: 1 1 200px; }
+.pick-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.pick-list button { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; }
+.pick-list small { color: var(--muted); font-variant-numeric: tabular-nums; }
+#removeFilter, .manual-form input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); }
+.choice-col { display: flex; flex-direction: column; gap: 4px; }
+.choice-col .hint { margin-bottom: 8px; }
+.manual-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }
+.manual-form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 14px; }
+.manual-form label:nth-of-type(3), .manual-form button { grid-column: 1 / -1; }
+.banner .check { display: block; margin-top: 4px; color: var(--muted); }
 .file input { display: none; }
 .file span { display: inline-block; background: var(--accent); color: var(--accent-ink); font-weight: 700; padding: 10px 14px; border-radius: 12px; cursor: pointer; }
 #stats table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }

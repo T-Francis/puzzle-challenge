@@ -34,6 +34,16 @@ class LiveTest(unittest.TestCase):
         self.assertAlmostEqual(sigma, ref["sigma"], places=12)
         self.assertEqual(strip(props), strip(ref["proposals"]))
 
+    def test_1b_placement_without_known_side_is_kept(self):
+        """A placement left with no known side (its only placed neighbour taken out) stays placed, unfitted."""
+        e = engine()
+        inner = next(c["id"] for c in e.b["cells"] if c["empty"] and not any((c["id"], k) in e.base for k in range(4)))
+        e.apply(dict(placed=[dict(cell=inner, piece="A001", rotation=0)], excluded=[]))
+        self.assertEqual([x["piece"] for x in e.placed], ["A001"])
+        self.assertIn(inner, e.filled)
+        self.assertNotIn(inner, e.fitted)
+        e.apply(dict(placed=[], excluded=[]))
+
     def test_2_wave1_is_proposed_first(self):
         """The first proposals of the workshop are those of wave 1 (bucket A = the wave rule)."""
         e = engine()

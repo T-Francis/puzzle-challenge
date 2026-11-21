@@ -28,7 +28,8 @@ MODEL = os.environ.get("PUZZLE_MODEL", os.path.join(ROOT, "data"))
 WEB = os.environ.get("PUZZLE_WEB", os.path.join(ROOT, "server", "web-dist"))
 SECURE = os.environ.get("PUZZLE_COOKIE_SECURE", "1") == "1"
 COOKIE = "__Host-puzzle" if SECURE else "puzzle"
-MAX_PHOTO = 25 * 1024 * 1024    # 64 Mpx phone photos weigh 10–15 MB; stored as is, never decoded here
+MAX_PHOTO = 80 * 1024 * 1024    # a 200 Mpx "ultra HD" JPEG weighs 30–60 MB (Cloudflare free plan: 100 MB); stored as is,
+                                # never decoded here (the recalibration decodes it at a reduced scale)
 MAX_JSON = 64 * 1024
 APP_VERSION = open(os.path.join(WEB, "VERSION")).read().strip() if os.path.exists(os.path.join(WEB, "VERSION")) else "dev"
 
@@ -238,14 +239,48 @@ async def undo(request):
     return api(payload, status)
 
 
+async def placed(request):
+    if not session(request):
+        return api(dict(error="login"), 401)
+    status, payload = await run_in_threadpool(workshop.placed_list)
+    return api(payload, status)
+
+
+async def remove(request):
+    if not session(request):
+        return api(dict(error="login"), 401)
+    try:
+        d = await body_json(request)
+        args = (str(d["event_id"])[:64], int(d["target"]), str(d["reason"]), d.get("device"))
+    except (ValueError, KeyError, TypeError):
+        return api(dict(error="bad_request"), 400)
+    status, payload = await run_in_threadpool(workshop.remove, *args)
+    return api(payload, status)
+
+
+async def manual(request):
+    if not session(request):
+        return api(dict(error="login"), 401)
+    try:
+        d = await body_json(request)
+        rot = d.get("rotation")
+        args = (str(d["event_id"])[:64], str(d["cell"])[:16], str(d["piece"])[:8], None if rot is None else int(rot), d.get("device"))
+    except (ValueError, KeyError, TypeError):
+        return api(dict(error="bad_request"), 400)
+    status, payload = await run_in_threadpool(workshop.manual, *args)
+    return api(payload, status)
+
+
 async def photo(request):
     if not session(request):
         return api(dict(error="login"), 401)
     try:
         data = await read_capped(request, MAX_PHOTO)
     except TooLarge:
+        log.warning("photo refused", extra=dict(ev="photo_refused", why="too_large"))
         return api(dict(error="too_large"), 413)
     if not data.startswith(b"\xff\xd8\xff"):
+        log.warning("photo refused", extra=dict(ev="photo_refused", why="not_jpeg", head=data[:4].hex()))
         return api(dict(error="not_jpeg"), 415)
     status, payload = await run_in_threadpool(workshop.photo, data, request.headers.get("x-device"))
     return api(payload, status)
@@ -291,7 +326,9 @@ class Guard(BaseHTTPMiddleware):
                 too_large = int(request.headers.get("content-length") or 0) > limit
             except ValueError:
                 too_large = True
-            if too_large:                                   # refused before anything is read
+            if too_large:                                   # refused before anything is read (logged: a phone shows it briefly)
+                log.warning("request too large", extra=dict(ev="too_large", path=request.url.path,
+                                                            length=request.headers.get("content-length", "")[:20]))
                 return api(dict(error="too_large"), 413)
         resp: Response = await call_next(request)
         h = resp.headers
@@ -330,6 +367,9 @@ app = Starlette(routes=[
     Route("/api/state", state),
     Route("/api/answer", answer, methods=["POST"]),
     Route("/api/undo", undo, methods=["POST"]),
+    Route("/api/placed", placed),
+    Route("/api/remove", remove, methods=["POST"]),
+    Route("/api/manual", manual, methods=["POST"]),
     Route("/api/photo", photo, methods=["POST"]),
     Route("/api/client-log", client_log, methods=["POST"]),
     Route("/api/diag", diag),

@@ -37,6 +37,53 @@ class JournalTest(unittest.TestCase):
         events.append(dict(seq=5, id="e5", type="undo", target=3))
         self.assertEqual([p["piece"] for p in journal.placements(events)["placed"]], ["A001", "A050"])
 
+    def test_remove_wrong_excludes_and_counts_as_failure(self):
+        """A placed piece found to have play: taken out, the pair excluded, the trial a failure; the others stay in order."""
+        events = [ev(1, "fits", "L1-C1", "A001", 90, proposal=dict(bucket="A")), ev(2, "fits", "L1-C2", "A002", proposal=dict(bucket="A")),
+                  ev(3, "fits", "L1-C3", "A003"),
+                  dict(seq=4, id="e4", type="remove", target=1, cell="L1-C1", piece="A001", rotation=90, reason="wrong")]
+        pl = journal.placements(events)
+        self.assertEqual([p["piece"] for p in pl["placed"]], ["A002", "A003"])
+        self.assertEqual(pl["excluded"], ["L1-C1:A001"])
+        self.assertEqual(journal.outcomes(events), [("A", False), ("A", True)])
+        # the removal is the last action: undo puts the piece back, at its own place in the order
+        events.append(dict(seq=5, id="e5", type="undo", target=4))
+        pl = journal.placements(events)
+        self.assertEqual([p["piece"] for p in pl["placed"]], ["A001", "A002", "A003"])
+        self.assertEqual(pl["excluded"], [])
+
+    def test_remove_other_neither_excludes_nor_counts(self):
+        events = [ev(1, "fits", "L1-C1", "A001", proposal=dict(bucket="B")),
+                  dict(seq=2, id="e2", type="remove", target=1, cell="L1-C1", piece="A001", rotation=0, reason="other")]
+        self.assertEqual(journal.placements(events), dict(placed=[], excluded=[]))
+        self.assertEqual(journal.outcomes(events), [])
+
+    def test_remove_must_target_a_placement_in_force(self):
+        events = [ev(1, "does_not_fit", "L1-C1", "A001"), ev(2, "fits", "L1-C2", "A002"),
+                  dict(seq=3, id="e3", type="remove", target=1, cell="L1-C1", piece="A001", reason="wrong"),     # a ✗
+                  dict(seq=4, id="e4", type="remove", target=2, cell="L1-C2", piece="A002", reason="bogus"),    # bad reason
+                  dict(seq=5, id="e5", type="remove", target=2, cell="L1-C2", piece="A002", reason="other"),
+                  dict(seq=6, id="e6", type="remove", target=2, cell="L1-C2", piece="A002", reason="wrong")]    # already out
+        self.assertEqual([e["seq"] for e in journal.effective(events)], [1, 2, 5])
+        self.assertEqual(journal.placements(events), dict(placed=[], excluded=["L1-C1:A001"]))
+
+    def test_manual_placement_lifts_the_exclusion(self):
+        """A ✗ later placed by the user herself: placed, no longer excluded, the ✗ counts as a success; undoable."""
+        events = [ev(1, "does_not_fit", "L5-C17", "A050", 180, proposal=dict(bucket="B")), ev(2, "fits", "L1-C2", "A002"),
+                  ev(3, "manual", "L5-C17", "A050", 180)]
+        pl = journal.placements(events)
+        self.assertEqual(pl["placed"], [dict(cell="L1-C2", piece="A002", rotation=0), dict(cell="L5-C17", piece="A050", rotation=180)])
+        self.assertEqual(pl["excluded"], [])
+        self.assertEqual(journal.outcomes(events), [("B", True)])
+        self.assertEqual(journal.skipped_cells([ev(1, "skip", "L5-C16"), ev(2, "manual", "L5-C17", "A050")],
+                                               lambda c: ["L5-C17"]), set())        # a manual placement wakes neighbours
+        events.append(dict(seq=4, id="e4", type="undo", target=3))
+        self.assertEqual(journal.placements(events)["excluded"], ["L5-C17:A050"])
+        # a manual placement can itself be taken out
+        events = [ev(1, "manual", "L5-C17", "A050", 180),
+                  dict(seq=2, id="e2", type="remove", target=1, cell="L5-C17", piece="A050", reason="wrong")]
+        self.assertEqual(journal.placements(events), dict(placed=[], excluded=["L5-C17:A050"]))
+
     def test_placements_format(self):
         events = [ev(1, "fits", "L1-C1", "A001", 90), ev(2, "fits_other_rotation", "L1-C2", "A002", 270),
                   ev(3, "does_not_fit", "L1-C3", "A003"), ev(4, "does_not_fit", "L1-C3", "A003"), ev(5, "skip", "L1-C4")]

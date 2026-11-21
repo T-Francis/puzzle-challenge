@@ -49,8 +49,13 @@ def status(work, **kw):
 
 
 def load_reduced(path):
+    """The photo, the right way up, reduced to MAX_SIDE px. A 200 Mpx "ultra HD" JPEG is decoded directly at a reduced
+    scale (JPEG draft: 1/2, 1/4 or 1/8), so it never sits in memory at full size."""
     from PIL import Image, ImageOps
-    im = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
+    Image.MAX_IMAGE_PIXELS = 260_000_000                   # the photos come from the logged-in user only
+    im = Image.open(path)
+    im.draft("RGB", (MAX_SIDE, MAX_SIDE))                  # largest JPEG scale still ≥ MAX_SIDE on both sides
+    im = ImageOps.exif_transpose(im).convert("RGB")
     k = MAX_SIDE / max(im.size)
     if k < 1:
         im = im.resize((round(im.size[0] * k), round(im.size[1] * k)), Image.LANCZOS)

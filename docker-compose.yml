@@ -13,7 +13,7 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    mem_limit: 2000m          # a recalibration photo peaks at ≈ 1.4 GiB with the server running
+    mem_limit: 3000m          # a recalibration photo peaks at ≈ 1.8 GB on top of the server (≈ 0.4 GB)
     pids_limit: 200
     environment:
       PUZZLE_ORIGIN: https://${DOMAIN:?set DOMAIN in .env}

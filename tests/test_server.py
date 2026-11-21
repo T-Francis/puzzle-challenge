@@ -142,6 +142,51 @@ class ServerTest(unittest.TestCase):
         self.assertIsNotNone(s["proposal"])
         self.assertEqual(ws._active_model(), ws.model_dir)          # what a restart would load
 
+    def test_6_remove_and_manual(self):
+        """Take out a placed piece (with the put-back banner), undo it, place a piece by hand."""
+        self.login()
+        c = self.client
+        lst = c.get("/api/placed").json()["placed"]
+        self.assertEqual(len(lst), 1)                                       # the piece placed in test_3
+        x = lst[0]
+        n0 = c.get("/api/state").json()["counts"]["black_placed"]
+        self.assertEqual(c.post("/api/remove", json=dict(event_id="r0", target=x["seq"], reason="nope")).status_code, 400)
+        self.assertEqual(c.post("/api/remove", json=dict(event_id="r0", target=99999, reason="wrong")).status_code, 409)
+        r = c.post("/api/remove", json=dict(event_id="r1", target=x["seq"], reason="wrong"))
+        self.assertEqual(r.status_code, 200)
+        s = r.json()
+        self.assertEqual(s["counts"]["black_placed"], n0 - 1)
+        self.assertNotIn(x["piece"], s["placed_pieces"])
+        self.assertEqual((s["put_back"]["piece"], s["put_back"]["cell"], s["put_back"]["remove"]), (x["piece"], x["cell"], True))
+        self.assertEqual(s["put_back"]["check"], [])
+        self.assertFalse(s["needs_photo"])
+        self.assertNotEqual((s["proposal"]["cell"], s["proposal"]["piece"]), (x["cell"], x["piece"]))   # excluded now
+        self.assertTrue(c.post("/api/remove", json=dict(event_id="r1", target=x["seq"], reason="wrong")).json().get("duplicate"))
+        self.assertEqual(c.get("/api/placed").json()["placed"], [])
+        # undo of the removal: placed again
+        self.assertEqual(s["undo"]["type"], "remove")
+        s = c.post("/api/undo", json=dict(event_id="u-r1", target=s["undo"]["seq"])).json()
+        self.assertEqual(s["counts"]["black_placed"], n0)
+        # taken out for another reason, then placed again by hand
+        s = c.post("/api/remove", json=dict(event_id="r2", target=x["seq"], reason="other")).json()
+        self.assertEqual(s["counts"]["black_placed"], n0 - 1)
+        r = c.post("/api/manual", json=dict(event_id="m0", cell=x["cell"], piece=x["piece"]))
+        self.assertEqual(r.status_code, 200)
+        pv = r.json()["preview"]
+        self.assertEqual(sorted(ch["rotation"] for ch in pv["choices"]), [0, 90, 180, 270])
+        self.assertEqual(c.get("/api/state").json()["counts"]["black_placed"], n0 - 1)      # a preview writes nothing
+        self.assertEqual(c.post("/api/manual", json=dict(event_id="m1", cell="L99-C1", piece=x["piece"])).status_code, 400)
+        self.assertEqual(c.post("/api/manual", json=dict(event_id="m1", cell=x["cell"], piece="Z001")).status_code, 400)
+        r = c.post("/api/manual", json=dict(event_id="m1", cell="L1-C1", piece=x["piece"]))      # frame corner, filled
+        self.assertEqual((r.status_code, r.json()["error"]), (409, "cell_filled"))
+        s = c.post("/api/manual", json=dict(event_id="m2", cell=x["cell"], piece=x["piece"], rotation=pv["choices"][0]["rotation"])).json()
+        self.assertEqual(s["counts"]["black_placed"], n0)
+        self.assertIn(x["piece"], s["placed_pieces"])
+        self.assertEqual(s["undo"]["type"], "manual")
+        r = c.post("/api/manual", json=dict(event_id="m3", cell=x["cell"], piece=x["piece"]))
+        self.assertEqual((r.status_code, r.json()["error"]), (409, "piece_placed"))
+        self.assertTrue(c.get("/api/placed").json()["placed"][0]["manual"])
+
     def test_5_public_limits(self):
         """What an anonymous visitor can do: no oversized body is read, a password attack never locks passkeys out."""
         c = TestClient(self.app_mod.app, headers={"CF-Connecting-IP": "203.0.113.50"})

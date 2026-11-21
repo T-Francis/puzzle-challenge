@@ -6,6 +6,7 @@
   const PAGE_VERSION = document.querySelector('meta[name="app-version"]').content;
   const BOARD_IMG = document.querySelector('meta[name="board-image"]').content;
   const pid = (id) => id[0] + Number(id.slice(1));        // "D051" -> "D51", as written on the sheets
+  const MAX_PHOTO_MB = 80;                                   // = server/app.py MAX_PHOTO
 
   // ------------------------------------------------------------------ texts (French by default, English available)
   const STR = {
@@ -26,10 +27,23 @@
       removeBack: (p) => `Retire <b>${pid(p.piece)}</b> de ${p.cell} et remets-la : plaque ${p.sheet} · ligne ${p.row} · col. ${p.col}, <b>dans ce sens</b>.`,
       weak: "Plus de proposition fiable : celles-ci sont faibles. Une photo du puzzle aiderait (menu).",
       photoDue: (n) => `${n} pièces posées depuis la dernière photo : pense à envoyer une photo du puzzle (menu).`,
-      undoText: (u) => (u.type === "skip" ? `Case ${u.cell} passée.` : u.type === "does_not_fit" ? `${pid(u.piece)} ne rentrait pas en ${u.cell}.` : `${pid(u.piece)} posée en ${u.cell}.`),
+      undoText: (u) => (u.type === "skip" ? `Case ${u.cell} passée.` : u.type === "does_not_fit" ? `${pid(u.piece)} ne rentrait pas en ${u.cell}.`
+        : u.type === "remove" ? `${pid(u.piece)} retirée de ${u.cell} (elle y sera de nouveau notée posée).` : u.type === "manual" ? `${pid(u.piece)} posée par toi en ${u.cell}.` : `${pid(u.piece)} posée en ${u.cell}.`),
+      fixTitle: "Corriger", removeOpen: "Retirer une pièce posée", manualOpen: "J'ai posé une pièce moi-même",
+      removeFilterPh: "Case (7 8) ou pièce (D51)", removeNone: "Aucune pièce posée ne correspond.", removeItem: (x) => `${pid(x.piece)} en ${x.cell}${x.manual ? " (posée par toi)" : ""}`,
+      removeAsk: (x) => `Retirer <b>${pid(x.piece)}</b> de <b>${x.cell}</b> ? Pourquoi ?`,
+      removeWrong: "Elle avait du jeu / n'allait pas ici", removeWrongHint: "Elle ne sera plus proposée dans cette case.",
+      removeOther: "Je la retire seulement", removeOtherHint: "Erreur de saisie ou autre raison : elle pourra être reproposée ici.",
+      checkToo: (l) => `Vérifie aussi ${l.map((x) => `${pid(x.piece)} en ${x.cell}`).join(", ")} : posée${l.length > 1 ? "s" : ""} ensuite à côté, en s'appuyant sur elle.`,
+      needsPhoto: "Cette case sera de nouveau proposée après la prochaine photo du puzzle.",
+      pieceLabel: "Pièce", next: "Suivant", manualWhichWay: "Dans quel sens l'as-tu posée ? (vue comme sur le puzzle)", likely: "le plus probable",
+      manualErr: { cell: "Cette case n'existe pas.", piece: "Pièce inconnue : écris la plaque et le numéro, par ex. D51.", cell_filled: "Cette case est déjà occupée.",
+        piece_placed: (d) => `Cette pièce est déjà notée posée en ${d.cell}.` },
       notSaved: "Réponse non enregistrée (réseau).", retry: "Réessayer", stale: "Déjà pris en compte : voici la proposition à jour.",
       badFit: "Attention : d'après les mesures, cette pièce s'emboîte mal ici. Vérifie qu'elle est bien à plat et bien orientée.",
       photoSent: "Photo envoyée : analyse en cours, tu peux continuer à poser.", photoError: "Photo non envoyée.", photoBusy: "Une photo est déjà en cours d'analyse.",
+      photoSending: (mb) => `Envoi de la photo (${mb} Mo)… garde l'appli ouverte.`, photoNotJpeg: "Photo non envoyée : ce n'est pas un JPEG (règle l'appareil photo sur JPEG, pas HEIF).",
+      photoTooBig: (mb) => `Photo trop lourde (${mb} Mo, maximum 80) : reprends-la en résolution normale ou 50 Mpx.`,
       recalRunning: (s) => `Photo reçue : analyse en cours (${({ start: "démarrage", photo: "lecture", board: "plateau", sharpness: "netteté", model: "modèle", sockets: "trous", scores: "calcul", switch: "mise en service" })[s.stage] || "…"}, ${Math.round(s.seconds / 60)} min). Tu peux continuer à poser.`,
       recalOk: "Photo prise en compte : les propositions repartent du puzzle photographié.",
       recalNo: {
@@ -63,10 +77,23 @@
       removeBack: (p) => `Take <b>${pid(p.piece)}</b> out of ${p.cell} and put it back: sheet ${p.sheet} · row ${p.row} · col. ${p.col}, <b>this way up</b>.`,
       weak: "No reliable proposal left: these are weak. A photo of the puzzle would help (menu).",
       photoDue: (n) => `${n} pieces placed since the last photo: please send a photo of the puzzle (menu).`,
-      undoText: (u) => (u.type === "skip" ? `Cell ${u.cell} skipped.` : u.type === "does_not_fit" ? `${pid(u.piece)} did not fit in ${u.cell}.` : `${pid(u.piece)} placed in ${u.cell}.`),
+      undoText: (u) => (u.type === "skip" ? `Cell ${u.cell} skipped.` : u.type === "does_not_fit" ? `${pid(u.piece)} did not fit in ${u.cell}.`
+        : u.type === "remove" ? `${pid(u.piece)} taken out of ${u.cell} (it will be recorded as placed there again).` : u.type === "manual" ? `${pid(u.piece)} placed by you in ${u.cell}.` : `${pid(u.piece)} placed in ${u.cell}.`),
+      fixTitle: "Correct", removeOpen: "Take out a placed piece", manualOpen: "I placed a piece myself",
+      removeFilterPh: "Cell (7 8) or piece (D51)", removeNone: "No placed piece matches.", removeItem: (x) => `${pid(x.piece)} in ${x.cell}${x.manual ? " (placed by you)" : ""}`,
+      removeAsk: (x) => `Take <b>${pid(x.piece)}</b> out of <b>${x.cell}</b>? Why?`,
+      removeWrong: "It had play / did not belong here", removeWrongHint: "It will no longer be proposed in this cell.",
+      removeOther: "Just taking it out", removeOtherHint: "Wrong entry or another reason: it may be proposed here again.",
+      checkToo: (l) => `Check ${l.map((x) => `${pid(x.piece)} in ${x.cell}`).join(", ")} too: placed next to it afterwards, partly on its sides.`,
+      needsPhoto: "This cell will be proposed again after the next photo of the puzzle.",
+      pieceLabel: "Piece", next: "Next", manualWhichWay: "Which way did you place it? (seen as on the puzzle)", likely: "most likely",
+      manualErr: { cell: "This cell does not exist.", piece: "Unknown piece: write the sheet and the number, e.g. D51.", cell_filled: "This cell is already filled.",
+        piece_placed: (d) => `This piece is already recorded as placed in ${d.cell}.` },
       notSaved: "Answer not saved (network).", retry: "Retry", stale: "Already taken into account: here is the current proposal.",
       badFit: "Careful: according to the measurements, this piece fits badly here. Check that it lies flat and the right way.",
       photoSent: "Photo sent: being analysed, you can keep placing.", photoError: "Photo not sent.", photoBusy: "A photo is already being analysed.",
+      photoSending: (mb) => `Sending the photo (${mb} MB)… keep the app open.`, photoNotJpeg: "Photo not sent: it is not a JPEG (set the camera to JPEG, not HEIF).",
+      photoTooBig: (mb) => `Photo too heavy (${mb} MB, 80 max): take it again at normal resolution or 50 Mpx.`,
       recalRunning: (s) => `Photo received: being analysed (${({ start: "starting", photo: "reading", board: "board", sharpness: "sharpness", model: "model", sockets: "holes", scores: "computing", switch: "switching" })[s.stage] || "…"}, ${Math.round(s.seconds / 60)} min). You can keep placing.`,
       recalOk: "Photo taken into account: the proposals now start from the photographed puzzle.",
       recalNo: {
@@ -100,6 +127,7 @@
     document.documentElement.lang = lang;
     document.querySelectorAll("[data-t]").forEach((e) => { const v = T(e.dataset.t); if (typeof v === "string") e.textContent = v; });
     document.querySelectorAll("[data-title]").forEach((e) => { e.title = T(e.dataset.title); e.setAttribute("aria-label", T(e.dataset.title)); });
+    document.querySelectorAll("[data-ph]").forEach((e) => { e.placeholder = T(e.dataset.ph); });
     $("#langBtn").textContent = T("lang");
     $("#pwShow").textContent = T($("#pw").type === "password" ? "showPw" : "hidePw");
     $("#themeBtn").textContent = T("themeTo")[theme === "dark" ? "light" : "dark"];
@@ -204,6 +232,7 @@
       const sv = document.createElementNS(NS, "svg"); sv.setAttribute("viewBox", "-80 -80 160 160");
       pieceSvg(sv, s.put_back.shape, 90 * s.put_back.display_turns);
       const p = document.createElement("p"); p.innerHTML = "↩ " + T(s.put_back.remove ? "removeBack" : "putBack")(s.put_back);
+      if (s.put_back.check && s.put_back.check.length) { const c = document.createElement("small"); c.className = "check"; c.textContent = T("checkToo")(s.put_back.check); p.appendChild(c); }
       const ok = document.createElement("button"); ok.type = "button"; ok.textContent = T("putBackDone");
       ok.onclick = () => { store.set("atelier.putBackDone", String(s.put_back.seq)); b.remove(); };
       b.append(sv, p, ok); banners.appendChild(b);
@@ -302,6 +331,7 @@
       if (status === 409) toast(T("stale"));
       else if (status >= 400 && status !== 503) toast(T("error"), { err: true });
       if (data.warning && data.warning.code === "bad_fit") toast(T("badFit"), { err: true, ms: 9000 });
+      if (data.needs_photo) toast(T("needsPhoto"), { ms: 9000 });
       if (navigator.vibrate) navigator.vibrate(status === 200 ? 25 : [60, 40, 60]);
       inFlight = false; document.body.classList.remove("busy");
       if (data.status === "ready" && !data.busy && data.counts) render(data); else refresh();
@@ -349,17 +379,96 @@
   };
   $("#langBtn").onclick = () => { lang = lang === "fr" ? "en" : "fr"; store.set("atelier.lang", lang); applyLang(); if (S) render(S); };
   $("#themeBtn").onclick = () => { theme = theme === "dark" ? "light" : "dark"; store.set("atelier.theme", theme); applyTheme(); applyLang(); };
+  // ------------------------------------------------------------------ corrections: take out a placed piece, a piece placed by hand
+  let placedList = [];
+  function matchPlaced(x, query) {
+    const q = query.trim().toUpperCase();
+    if (!q) return true;
+    const [l, c] = x.cell.match(/\d+/g).map(Number);
+    const nums = (q.match(/\d+/g) || []).map(Number);
+    const piece = q.replace(/\s+/g, "").match(/^([A-E])0*(\d+)$/);
+    if (piece) return pid(x.piece).startsWith(piece[1] + Number(piece[2])) || (piece[1] === "C" && c === Number(piece[2]));
+    if (nums.length >= 2) return l === nums[0] && c === nums[1];
+    if (nums.length === 1) return l === nums[0];
+    return `${pid(x.piece)} ${x.cell}`.toUpperCase().includes(q);
+  }
+  function drawRemoveList() {
+    const ul = $("#removeList"); ul.replaceChildren();
+    const shown = placedList.filter((x) => matchPlaced(x, $("#removeFilter").value)).slice(0, 80);
+    if (!shown.length) { const li = document.createElement("li"); li.className = "hint"; li.textContent = T("removeNone"); ul.appendChild(li); return; }
+    for (const x of shown) {
+      const li = document.createElement("li"), b = document.createElement("button"); b.type = "button";
+      const when = (x.ts || "").slice(5, 16).replace("T", " ").replace(/^(\d\d)-(\d\d)/, "$2/$1");
+      b.innerHTML = `<span>${T("removeItem")(x)}</span><small>${when}</small>`;
+      b.onclick = () => {
+        $("#removePick").classList.add("hidden"); $("#removeConfirm").classList.remove("hidden");
+        $("#removeText").innerHTML = T("removeAsk")(x);
+        const go = (reason) => { $("#removeDlg").close(); send("/api/remove", { event_id: uuid(), target: x.seq, reason, device: device() }); };
+        $("#removeWrong").onclick = () => go("wrong");
+        $("#removeOther").onclick = () => go("other");
+      };
+      li.appendChild(b); ul.appendChild(li);
+    }
+  }
+  $("#removeBtn").onclick = async () => {
+    $("#menuDlg").close();
+    placedList = []; $("#removeFilter").value = "";
+    $("#removePick").classList.remove("hidden"); $("#removeConfirm").classList.add("hidden");
+    $("#removeList").replaceChildren();
+    $("#removeDlg").showModal();
+    try {
+      const { status, data } = await api("GET", "/api/placed");
+      if (status === 200) { placedList = data.placed; drawRemoveList(); } else toast(T("error"), { err: true });
+    } catch (e) { if (e instanceof NetError) toast(T("error"), { err: true }); }
+  };
+  $("#removeFilter").oninput = drawRemoveList;
+
+  $("#manualBtn").onclick = () => {
+    $("#menuDlg").close();
+    $("#manualForm").reset(); $("#manualForm").classList.remove("hidden"); $("#manualRot").classList.add("hidden");
+    $("#manualErr").textContent = "";
+    $("#manualDlg").showModal();
+  };
+  $("#manualForm").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const err = (code, d) => { const m = T("manualErr")[code]; $("#manualErr").textContent = m ? (typeof m === "function" ? m(d) : m) : T("error"); };
+    const m = $("#manualPiece").value.trim().toUpperCase().match(/^([A-E])\s*0*(\d{1,3})$/);
+    if (!m) { err("piece"); return; }
+    const cell = `L${Number($("#manualRow").value)}-C${Number($("#manualCol").value)}`, piece = m[1] + m[2].padStart(3, "0");
+    $("#manualErr").textContent = "";
+    let r;
+    try { r = await api("POST", "/api/manual", { event_id: uuid(), cell, piece, device: device() }); } catch (e) { if (e instanceof NetError) err("x"); return; }
+    if (r.status !== 200 || !r.data.preview) { err(r.data.error, r.data); return; }
+    const pv = r.data.preview, box = $("#manualChoices"); box.replaceChildren();
+    pv.choices.forEach((ch, i) => {
+      const b = document.createElement("button"); b.type = "button";
+      const sv = document.createElementNS(NS, "svg"); sv.setAttribute("viewBox", "-80 -80 160 160");
+      pieceSvg(sv, pv.shape, ch.rotation);                      // as it sits on the board, like the board zoom
+      const t = document.createElement("small"); t.textContent = i === 0 && ch.rms !== null ? T("likely") : " ";
+      b.append(sv, t);
+      b.onclick = () => { $("#manualDlg").close(); send("/api/manual", { event_id: uuid(), cell, piece, rotation: ch.rotation, device: device() }); };
+      box.appendChild(b);
+    });
+    $("#manualForm").classList.add("hidden"); $("#manualRot").classList.remove("hidden");
+  };
+
   $("#logoutBtn").onclick = async () => { await api("POST", "/api/logout", {}).catch(() => {}); $("#menuDlg").close(); showLogin(); };
   $("#photoInput").onchange = async (ev) => {
     const f = ev.target.files[0]; ev.target.value = "";
     if (!f) return;
     $("#menuDlg").close();
+    const mb = Math.round(f.size / 1048576);
+    const long = { err: true, ms: 15000 };
+    if (f.size > MAX_PHOTO_MB * 1048576) { toast(T("photoTooBig")(mb), long); return; }
+    toast(T("photoSending")(mb), { ms: 600000 });                   // a big photo takes a while over a phone network
     try {
       const { status, data } = await api("POST", "/api/photo", null, f);
-      if (status === 200) { toast(T("photoSent")); render(data); }
-      else if (status === 409) { toast(T("photoBusy"), { err: true }); render(data); }
-      else toast(T("photoError"), { err: true });
-    } catch { toast(T("photoError"), { err: true }); }
+      if (status === 200) { toast(T("photoSent"), { ms: 8000 }); render(data); }
+      else if (status === 409) { toast(T("photoBusy"), long); render(data); }
+      else if (status === 413) toast(T("photoTooBig")(mb), long);
+      else if (status === 415) toast(T("photoNotJpeg"), long);
+      else toast(T("photoError"), long);
+    } catch { toast(T("photoError"), long); }
   };
 
   // ------------------------------------------------------------------ login and passkeys (WebAuthn)

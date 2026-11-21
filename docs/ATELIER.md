@@ -67,6 +67,8 @@ Unit of work = **one cell** and its **ranked candidates**. For each candidate: w
 | U5 | No credible candidate left in the cell | Clear message; the cell **sleeps** until one of its neighbours is placed (new edges → new candidates); next cell. |
 | U6 | **Skip the cell** | The cell comes back when a neighbour changes or after 10 other answers. The pieces stay available everywhere. No permanent dead end. |
 | U7 | **Undo** | Undoes the last action (then the previous one, etc.). For an undone ✓: "remove C47 from L18-C23 and put it back on sheet C, row 4, col. 7, this way up". |
+| U7a | **Take out a placed piece** (menu → Correct; e.g. it turns out to have play) | List of the workshop placements, newest first, filtered by cell ("7 8") or piece ("D51") → why? **"It had play / did not belong here"** (the pair is excluded, the trial counts as a failure in the calibration) or **"Just taking it out"** (no exclusion, the trial no longer counts). The cell is empty again (its sockets rebuilt from its neighbours), the piece available again; banner "↩ take D51 out of L7-C8 and put it back…", plus the pieces placed next to it afterwards, partly on its sides: "check them too". Undoable while it is the last action. A cell filled on an accepted recalibration photo has no hole outline: it is proposed again after the next photo. |
+| U7b | **I placed a piece myself** (menu → Correct) | Cell (row, column) + piece number → the 4 orientations drawn as on the puzzle, the best computed fit first ("most likely") → tap the one placed. Recorded as a placement; an earlier ✗ of the same pair is lifted (and counts as a success). Undoable while it is the last action. |
 | U8 | Double tap, page left open, two phones | Each answer carries the identifier of the displayed proposal: a stale answer is refused, the page refreshes. Consistent even with two people. |
 | U9 | Network lost while sending | "Answer not recorded — retry". Resending is safe (unique event identifier: never counted twice). **No offline queue**: nothing is placed on a hypothesis the server has not validated. |
 | U10 | No reliable proposal left anywhere | Continue with proposals marked "weak", or take a recalibration photo (U11). |
@@ -138,8 +140,8 @@ after a ✗ the workshop stays on the same cell while such a candidate exists, o
 ## 6. Data and persistence
 
 **On the server** (host directory mounted as a volume):
-- `journal.jsonl`: one event per line, **append only**, written to disk synchronously. Fields: number, timestamp, unique identifier (sent by the page: resend without duplicate), type (`fits`, `fits_other_rotation`, `does_not_fit`, `skip`, `undo`, `recalibration_photo`, `recalibration`, `recalibration_failed`), complete proposal (cell, piece, rotation, rank, stability, %, chance), model version, app version, device.
-- `photos/`: recalibration photos sent from the workshop (JPEG checked, ≤ 25 MB); `recalibration/<photo>/`: processing (`status.json`, `expected.json`) and, when accepted, the new model (`model/`, loaded by the workshop and named in the journal event `recalibration`).
+- `journal.jsonl`: one event per line, **append only**, written to disk synchronously. Fields: number, timestamp, unique identifier (sent by the page: resend without duplicate), type (`fits`, `fits_other_rotation`, `does_not_fit`, `skip`, `undo`, `remove` (U7a), `manual` (U7b), `correction` (written by hand), `recalibration_photo`, `recalibration`, `recalibration_failed`), complete proposal (cell, piece, rotation, rank, stability, %, chance), model version, app version, device.
+- `photos/`: recalibration photos sent from the workshop (JPEG checked, ≤ 80 MB; a 200 Mpx photo is decoded at a reduced scale); `recalibration/<photo>/`: processing (`status.json`, `expected.json`) and, when accepted, the new model (`model/`, loaded by the workshop and named in the journal event `recalibration`).
 - `backups/`: daily copy of the journal (30 days).
 - `auth/`: sessions and passkeys as small JSON files (atomic writes); the password hash comes from the environment.
 
@@ -156,7 +158,7 @@ after a ✗ the workshop stays on the same cell while such a candidate exists, o
 | L3 | The container restarts | `restart: unless-stopped`, health check; journal replay; the page shows the loader then **the same proposal** (everything derives from the journal, including skipped or sleeping cells). No loss: every accepted answer is already on disk. |
 | L4 | Code update (interface fix) | Journal copy, new image, journal untouched; the page sees the new version and reloads between two answers. |
 | L5 | New model (catalog fix, parameters) | Prepared and checked on the workstation: **replay of the journal on the new model** (do all ✓ placements stay consistent? which proposals change?) → new image. |
-| L6 | Recalibration photo | **Automatic** (`src/recalibrate.py` in its own process, launched by `server/workshop.py`): photo reduced to ≤ 5000 px; frame; orientation chosen by agreement with the journal; sharpness (edge width ≤ 2.35 photo pixels); empty cells = `params.json` `empty_cells` minus the placements recorded (any difference rejects the photo and is named); sockets not worse than the current model; new model directory in the volume (catalog copied, new board, score cache); the workshop switches to it and writes `recalibration` in the journal (`recalibration_failed` with the reason otherwise, `interrupted` after a restart). The placements visible on the photo become measured holes: they are no longer fitted from the catalog (`live.place`, `solve.effective_sockets`). On restart, the last `recalibration` of the journal gives the model. Measured: ≈ 140 s, ≈ 1.4 GiB at the peak with the server running. |
+| L6 | Recalibration photo | **Automatic** (`src/recalibrate.py` in its own process, launched by `server/workshop.py`): photo reduced to ≤ 5000 px; frame; orientation chosen by agreement with the journal; sharpness (edge width ≤ 2.35 photo pixels); empty cells = `params.json` `empty_cells` minus the placements recorded (any difference rejects the photo and is named); sockets not worse than the current model; new model directory in the volume (catalog copied, new board, score cache); the workshop switches to it and writes `recalibration` in the journal (`recalibration_failed` with the reason otherwise, `interrupted` after a restart). The placements visible on the photo become measured holes: they are no longer fitted from the catalog (`live.place`, `solve.effective_sockets`). On restart, the last `recalibration` of the journal gives the model. Measured: ≈ 100–140 s, ≈ 1.8 GB at the peak (whatever the photo size), on top of the server. |
 | L7 | Rollback | Previous image; journal compatible (versioned format, append only). |
 | L8 | End of the puzzle | U13; final journal versioned; "real timeline" demo. |
 
@@ -175,7 +177,7 @@ after a ✗ the workshop stays on the same cell while such a candidate exists, o
 
 - One account. Password hashed (scrypt) in the environment; passkey (WebAuthn, fingerprint, ES256 / RS256) registered after the first login; cookie `HttpOnly`, `Secure`, `SameSite=Strict`, 1 year, extended on use; 5 attempts / 15 min per address. `PUZZLE_DEV_AUTOLOGIN=1` skips the login in local development only (refused with secure cookies).
 - Public demo read only; workshop and API behind the login; POST accepted from the same origin only.
-- Container without root, read-only file system (except the volume and `/tmp`), `cap_drop: ALL`, bounded memory and processes; strict CSP, no inline script; photo upload limited (JPEG, ≤ 25 MB). In production, only the reverse proxy's addresses are accepted (Cloudflare ranges in `docker-compose.yml`).
+- Container without root, read-only file system (except the volume and `/tmp`), `cap_drop: ALL`, bounded memory and processes; strict CSP, no inline script; photo upload limited (JPEG, ≤ 80 MB). In production, only the reverse proxy's addresses are accepted (Cloudflare ranges in `docker-compose.yml`).
 
 ## 10. Logs and diagnostics
 
@@ -201,7 +203,7 @@ after a ✗ the workshop stays on the same cell while such a candidate exists, o
 
 | Risk | Counter-measure |
 |---|---|
-| Wrong ✓ (piece badly placed) corrupting the neighbours | warning if the computed fit is bad; undo; recalibration photo |
+| Wrong ✓ (piece badly placed) corrupting the neighbours | warning if the computed fit is bad; undo; take out a placed piece (U7a, names the neighbours placed on it); recalibration photo |
 | Piece put back the wrong way on its sheet after ✗ | put-back banner with thumbnail; "fits another way" catches the case |
 | Accumulating error (placements drawn from the catalog) | recalibration photo every ≈ 30 placements (L6) |
 | Old version served by a cache | § 8 |

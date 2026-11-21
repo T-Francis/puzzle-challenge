@@ -106,9 +106,12 @@ class Workshop:
         put_back = None
         if eff and eff[-1]["type"] == "does_not_fit" and last_raw is eff[-1]:
             put_back = dict(self._piece_info(eff[-1]["piece"]), cell=eff[-1]["cell"], remove=False, seq=eff[-1]["seq"])
+        elif eff and eff[-1]["type"] == "remove" and last_raw is eff[-1]:
+            put_back = dict(self._piece_info(last_raw["piece"]), cell=last_raw["cell"], remove=True, seq=last_raw["seq"],
+                            check=self._leaning_on(eff, last_raw))
         elif last_raw and last_raw["type"] == "undo":
             undone = next((x for x in self.events if x["seq"] == last_raw.get("target")), None)
-            if undone and undone["type"] in ("fits", "fits_other_rotation"):
+            if undone and undone["type"] in journal.PLACING:
                 put_back = dict(self._piece_info(undone["piece"]), cell=undone["cell"], remove=True, seq=last_raw["seq"])
         prop = None
         if self.current:
@@ -120,7 +123,7 @@ class Workshop:
         undo = None
         if eff:
             u = eff[-1]
-            undo = dict(seq=u["seq"], type=u["type"], cell=u.get("cell"), piece=u.get("piece"))
+            undo = dict(seq=u["seq"], type=u["type"], cell=u.get("cell"), piece=u.get("piece"), reason=u.get("reason"))
         b = e.b
         board = dict(cols=b["cols"], rows=b["rows"], cw=b["cell_w_u"], ch=b["cell_h_u"],
                      w=round(b["cols"] * b["cell_w_u"], 1), h=round(b["rows"] * b["cell_h_u"], 1))
@@ -128,10 +131,28 @@ class Workshop:
                     placed_pieces=[x["piece"] for x in placed],
                     counts=dict(placed=INITIAL_PLACED + len(placed), left=TOTAL_BLACK - len(placed), black_placed=len(placed),
                                 total=INITIAL_PLACED + TOTAL_BLACK,
-                                today_fits=sum(1 for x in day if x["type"] in ("fits", "fits_other_rotation")),
+                                today_fits=sum(1 for x in day if x["type"] in journal.PLACING),
                                 today_misses=sum(1 for x in day if x["type"] == "does_not_fit"),
                                 since_photo=len(placed) - self._placed_at_last_photo()),
                     calibration=self.cal, compute_s=self.compute_s, recalibration=self._recal_payload())
+
+    def _leaning_on(self, eff, rm):
+        """Pieces still placed next to the cell of a removed placement, placed after it: they were proposed partly on
+        its sides, worth checking."""
+        nb = {n for _, n in self.engine.neighbours(rm["cell"])}
+        order = {e["seq"]: i for i, e in enumerate(eff)}
+        t = order.get(rm["target"], -1)
+        return [dict(cell=e["cell"], piece=e["piece"]) for e in journal.in_force(eff)
+                if e["cell"] in nb and order[e["seq"]] > t and e["seq"] < rm["seq"]]
+
+    def placed_list(self):
+        """Placements in force made in the workshop, newest first (for "take out a placed piece")."""
+        if self.status != "ready":
+            return 503, dict(status=self.status)
+        with self.lock:
+            eff = journal.effective(self.events)
+            return 200, dict(placed=[dict(seq=e["seq"], cell=e["cell"], piece=e["piece"], ts=e.get("ts"), manual=e["type"] == "manual")
+                                     for e in reversed(journal.in_force(eff))])
 
     def _placed_at_last_photo(self):
         at = 0
@@ -199,6 +220,64 @@ class Workshop:
             self.events.append(ev)
             self._recompute()
             log.info("undo", extra=dict(ev="undo", seq=ev["seq"], target=target, compute_s=self.compute_s))
+            return 200, self.payload()
+
+    def remove(self, event_id, target, reason, device=None):
+        """Takes an earlier placement out of the puzzle (journal "remove")."""
+        if self.status != "ready":
+            return 503, self.payload()
+        if reason not in journal.REMOVE_REASONS:
+            return 400, dict(error="reason")
+        with self.lock:
+            if any(x["id"] == event_id for x in self.events):
+                return 200, dict(self.payload(), duplicate=True)
+            a = next((e for e in journal.in_force(journal.effective(self.events)) if e["seq"] == target), None)
+            if a is None:
+                return 409, dict(self.payload(), stale=True)
+            ev = self._event("remove", device, id=event_id, target=target, cell=a["cell"], piece=a["piece"],
+                             rotation=a["rotation"], reason=reason)
+            journal.append(self.path, ev)
+            self.events.append(ev)
+            self._recompute()
+            log.info("remove", extra=dict(ev="remove", seq=ev["seq"], target=target, cell=a["cell"], piece=a["piece"],
+                                          reason=reason, compute_s=self.compute_s))
+            # a cell measured filled on the recalibration photo has no hole outline: proposed again after the next photo
+            return 200, dict(self.payload(), needs_photo=not self.engine.C[a["cell"]]["empty"])
+
+    def manual(self, event_id, cell, piece, rotation=None, device=None):
+        """A piece the user placed herself (journal "manual"). Without rotation: nothing written, returns the four
+        orientations, best fit first, for her to pick the one she placed."""
+        if self.status != "ready":
+            return 503, self.payload()
+        e = self.engine
+        if cell not in e.C:
+            return 400, dict(error="cell")
+        if piece not in e.P:
+            return 400, dict(error="piece")
+        if rotation is not None and rotation not in (0, 90, 180, 270):
+            return 400, dict(error="rotation")
+        with self.lock:
+            if any(x["id"] == event_id for x in self.events):
+                return 200, dict(self.payload(), duplicate=True)
+            placed = journal.placements(self.events)["placed"]
+            at = next((x["cell"] for x in placed if x["piece"] == piece), None)
+            if at:
+                return 409, dict(error="piece_placed", cell=at)
+            # a cell filled on the model is open only if a workshop placement there was taken out since the photo
+            ours = {x.get("cell") for x in self.events if x["type"] in journal.PLACING}
+            if (not e.C[cell]["empty"] and cell not in ours) or cell in e.filled or any(x["cell"] == cell for x in placed):
+                return 409, dict(error="cell_filled")
+            if rotation is None:
+                fits = [(live.fit_quality(e, cell, piece, q), q) for q in range(4)]
+                fits.sort(key=lambda f: (f[0] is None, f[0] or 0, f[1]))
+                return 200, dict(preview=dict(cell=cell, piece=piece, shape=self._shape(piece), choices=[
+                    dict(rotation=q * 90, rms=None if r is None else round(r, 2)) for r, q in fits]))
+            ev = self._event("manual", device, id=event_id, cell=cell, piece=piece, rotation=rotation)
+            journal.append(self.path, ev)
+            self.events.append(ev)
+            self._recompute()
+            log.info("manual", extra=dict(ev="manual", seq=ev["seq"], cell=cell, piece=piece, rotation=rotation,
+                                          compute_s=self.compute_s))
             return 200, self.payload()
 
     def photo(self, data, device=None):
