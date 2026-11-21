@@ -11,7 +11,7 @@
   const STR = {
     fr: {
       appName: "Atelier · Lunes", starting: "Démarrage…", loginPasskey: "Se connecter avec l'empreinte", password: "Mot de passe",
-      login: "Se connecter", wrongPassword: "Mot de passe incorrect.", tooMany: "Trop d'essais : réessaie dans 15 minutes.",
+      login: "Se connecter", showPw: "Afficher", hidePw: "Masquer", wrongPassword: "Mot de passe incorrect.", tooMany: "Trop d'essais : réessaie dans 15 minutes.",
       take: "Prendre", turn: "Tourner", place: "Poser", sheet: "plaque", line: "ligne", column: "colonne",
       turns: ["Ne pas la tourner", "¼ de tour vers la droite", "Demi-tour", "¼ de tour vers la gauche"],
       otherWay: "Rentre dans un autre sens", skip: "Passer la case", undo: "Annuler", noFit: "ne rentre pas", fits: "rentre",
@@ -48,7 +48,7 @@
     },
     en: {
       appName: "Workshop · Moons", starting: "Starting…", loginPasskey: "Log in with fingerprint", password: "Password",
-      login: "Log in", wrongPassword: "Wrong password.", tooMany: "Too many attempts: try again in 15 minutes.",
+      login: "Log in", showPw: "Show", hidePw: "Hide", wrongPassword: "Wrong password.", tooMany: "Too many attempts: try again in 15 minutes.",
       take: "Take", turn: "Turn", place: "Place", sheet: "sheet", line: "row", column: "column",
       turns: ["Do not turn it", "¼ turn clockwise", "Half turn", "¼ turn anticlockwise"],
       otherWay: "Fits another way", skip: "Skip cell", undo: "Undo", noFit: "does not fit", fits: "fits",
@@ -101,6 +101,7 @@
     document.querySelectorAll("[data-t]").forEach((e) => { const v = T(e.dataset.t); if (typeof v === "string") e.textContent = v; });
     document.querySelectorAll("[data-title]").forEach((e) => { e.title = T(e.dataset.title); e.setAttribute("aria-label", T(e.dataset.title)); });
     $("#langBtn").textContent = T("lang");
+    $("#pwShow").textContent = T($("#pw").type === "password" ? "showPw" : "hidePw");
     $("#themeBtn").textContent = T("themeTo")[theme === "dark" ? "light" : "dark"];
   }
 
@@ -362,11 +363,17 @@
   // ------------------------------------------------------------------ login and passkeys (WebAuthn)
   const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   const unb64u = (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+  function showPassword(on) {
+    $("#pw").type = on ? "text" : "password";
+    $("#pwShow").setAttribute("aria-pressed", String(on));
+    $("#pwShow").textContent = T(on ? "hidePw" : "showPw");
+  }
+  $("#pwShow").onclick = () => { showPassword($("#pw").type === "password"); $("#pw").focus(); };
   $("#pwForm").onsubmit = async (ev) => {
     ev.preventDefault();
     try {
       const { status } = await api("POST", "/api/login", { password: $("#pw").value });
-      if (status === 200) { $("#pw").value = ""; afterLogin(); }
+      if (status === 200) { $("#pw").value = ""; showPassword(false); afterLogin(); }
       else $("#loginErr").textContent = T(status === 429 ? "tooMany" : "wrongPassword");
     } catch { $("#loginErr").textContent = T("notSaved"); }
   };

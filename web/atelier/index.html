@@ -28,7 +28,10 @@
   <button id="pkLogin" class="primary hidden" type="button" data-t="loginPasskey"></button>
   <form id="pwForm">
     <label for="pw" data-t="password"></label>
-    <input id="pw" type="password" autocomplete="current-password" required>
+    <div class="pw-row">
+      <input id="pw" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required>
+      <button id="pwShow" type="button" aria-pressed="false" aria-controls="pw"></button>
+    </div>
     <button type="submit" data-t="login"></button>
   </form>
   <p id="loginErr" class="err" role="alert"></p>
