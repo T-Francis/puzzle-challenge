@@ -18,6 +18,7 @@ NPROF = 128
 
 
 PAPER_LEVEL = 220.0     # grey level of the paper after normalisation (= the 2026-11-18 reference, where it was even)
+DISAGREE_SURE = (0.2, 0.8)  # paper share at a cell centre: between these, a disagreement with the journal is too close to call
 
 
 def illumination(rimg):
@@ -454,18 +455,24 @@ def main(photo=BOARD_PHOTO, out=None, img=None, expected=None):
         print(f"cell {cid} forced filled (measured occupancy {occ[r, c]:.2f})")
         occ[r, c] = 0.0
     # known empty cells (params.json, minus the placements): the photo must agree; the list wins, disagreements are
-    # reported (an outdated list, a cell numbering reversed by a rotated photo, a mask error)
+    # reported (an outdated list, a cell numbering reversed by a rotated photo, a mask error). Only a clear contradiction
+    # counts: a hole closed in by placed pieces shows little paper at its centre (their tabs reach into it: L7-C24
+    # measured 0.47 on 2026-11-21), while a piece placed without being recorded leaves ≈ 0 and a piece taken out ≈ 1.
     disagree = []
     if expected:
         exp = np.zeros((NR, NC), bool)
         for cid in expected:
             exp[cell_rc(cid)] = True
+        close = []
         for r in range(NR):
             for c in range(NC):
-                if exp[r, c] != (occ[r, c] > 0.5):
-                    disagree.append(dict(cell=f"L{r + 1}-C{c + 1}", expected="empty" if exp[r, c] else "filled",
-                                         occupancy=round(float(occ[r, c]), 2)))
-                    occ[r, c] = 0.99 if exp[r, c] else 0.0
+                if exp[r, c] == (occ[r, c] > 0.5):
+                    continue
+                d = dict(cell=f"L{r + 1}-C{c + 1}", expected="empty" if exp[r, c] else "filled", occupancy=round(float(occ[r, c]), 2))
+                (close if DISAGREE_SURE[0] <= occ[r, c] <= DISAGREE_SURE[1] else disagree).append(d)
+                occ[r, c] = 0.99 if exp[r, c] else 0.0
+        if close:
+            print("too close to call, the list kept:", [(d["cell"], d["expected"], d["occupancy"]) for d in close])
         known = {d["cell"] for d in disagree}
         for comp in comps:
             for cid in comp.get("unexpected_cells", []):
